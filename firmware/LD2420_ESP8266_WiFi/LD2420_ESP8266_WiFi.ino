@@ -1,7 +1,7 @@
 /*
  * ================================================================================
- * HLK-LD2420 PRESENCE INTELLIGENCE PLATFORM — ESP32 FIRMWARE v5.0
- * Hardware: ESP32 / ESP32-S3 / ESP32-P4 (Dual Core RTOS Optimized)
+ * HLK-LD2420 PRESENCE INTELLIGENCE PLATFORM — ESP8266 FIRMWARE v4.0
+ * ================================================================================
  *
  * Features:
  *  - Full ASCII + binary protocol parser (ON / OFF / Range NNNN)
@@ -36,14 +36,14 @@
 // ================================================================================
 // INCLUDES
 // ================================================================================
-#include <WiFi.h>
-#include <WebServer.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
 #include <WiFiManager.h> // Captive portal for secure WiFi setup
 #if ENABLE_MDNS
-#include <ESPmDNS.h>
+#include <ESP8266mDNS.h>
 #endif
 #include <WebSocketsServer.h>
-#include <HardwareSerial.h>
+#include <SoftwareSerial.h>
 #if ENABLE_OTA
 #include <ArduinoOTA.h>
 #endif
@@ -82,177 +82,44 @@ const char* MQTT_TOPIC_BASE  = "homeassistant/sensor/ld2420";
 #define SNAPSHOT_SIZE    256   // ASCII ring buffer size for web terminal (reduced to save RAM)
 
 // ================================================================================
-// PRESENCE STATES
-// ================================================================================
-enum PresenceState : uint8_t {
-    STATE_EMPTY              = 0,
-    STATE_POSSIBLE           = 1,
-    STATE_MOTION_DETECTED    = 2,
-    STATE_STATIC_PRESENCE    = 3,
-    STATE_MICRO_MOTION       = 4,
-    STATE_CONFIRMED_HUMAN    = 5,
-    STATE_SLEEPING           = 6,
-    STATE_MULTI_MOVEMENT     = 7,
-    STATE_UNKNOWN_ACTIVITY   = 8
-};
 
-const char* PRESENCE_STATE_NAMES[] = {
-    "EMPTY", "POSSIBLE", "MOTION", "STATIC", "MICRO-MOTION",
-    "CONFIRMED", "SLEEPING", "MULTI-MOVEMENT", "UNKNOWN"
-};
+#include "LD2420_AppLogic.hpp"
 
-// ================================================================================
-// ACTIVITY STATES
-// ================================================================================
-enum ActivityType : uint8_t {
-    ACTIVITY_NONE      = 0,
-    ACTIVITY_WALKING   = 1,
-    ACTIVITY_STANDING  = 2,
-    ACTIVITY_SITTING   = 3,
-    ACTIVITY_SLEEPING  = 4,
-    ACTIVITY_WORKING   = 5,
-    ACTIVITY_RESTING   = 6,
-    ACTIVITY_ENTER     = 7,
-    ACTIVITY_EXIT      = 8,
-    ACTIVITY_UNKNOWN   = 9
-};
+#include <SoftwareSerial.h>
+SoftwareSerial radarSerial(PIN_RADAR_RX, PIN_RADAR_TX); // RX, TX
 
-const char* ACTIVITY_NAMES[] = {
-    "None", "Walking", "Standing", "Sitting", "Sleeping",
-    "Working", "Resting", "Entry", "Exit", "Unknown"
-};
-
-// ================================================================================
-// DATA STRUCTURES
-// ================================================================================
-struct ZoneData {
-    uint8_t  motion_intensity;   // 0-100
-    uint8_t  static_intensity;   // 0-100
-    uint8_t  occupancy_prob;     // 0-100 %
-    uint8_t  presence_count;     // how often detected in this zone
-};
-
-struct OccupancySession {
-    uint32_t start_ms;
-    uint32_t end_ms;
-    float    avg_distance_cm;
-    bool     active;
-};
-
-#define MAX_SESSIONS 4   // Reduced from 16 to save RAM
-#define HISTORY_BINS 12  // Reduced from 24 to save RAM
-
-struct RadarState {
-    // Raw protocol values
-    bool     presence_serial;
-    bool     presence_hardware;
-    uint32_t range_cm;           // centimeters (raw from sensor)
-    uint32_t moving_range_cm;     // centimeters (moving target only)
-    uint32_t static_range_cm;     // centimeters (static target / obstacles)
-    char     detected_message[64]; // human-readable status message
-    
-    // True Physics Engine
-    int32_t  velocity_cm_s;      // Real calculus velocity (cm/s)
-    bool     tangential_motion;  // Left-to-Right trajectory inference
-    
-    uint8_t  energy_moving;      // Internal logic parameter
-    uint8_t  energy_static;      // Internal logic parameter
-
-    // Probabilistic HMM & AKF States
-    float    kalman_innov;       // Adaptive Kalman Innovation Residual
-    float    markov_probs[6];    // Hidden Markov Model Probabilities [IDLE, SLEEPING, SITTING, STANDING, WALKING, RUNNING]
-
-    // Derived intelligence
-    PresenceState presence_state;
-    ActivityType  activity;
-    uint8_t  presence_confidence;   // 0-100 %
-    uint8_t  human_confidence;      // 0-100 %
-    uint8_t  occupancy_confidence;  // 0-100 %
-    uint8_t  signal_quality;        // 0-100 %
-    int8_t   noise_floor_est;       // estimated dBm-like (arbitrary units)
-
-    // Motion scoring
-    uint8_t  motion_score;
-    uint8_t  activity_score;
-    uint8_t  restlessness_score;
-    uint8_t  stability_score;
-
-    // Zone data — 8 zones × 1m each (zone 0 = 0–1m, zone 7 = 7–8m)
-    ZoneData zones[8];
-
-    // Sessions
-    OccupancySession sessions[MAX_SESSIONS];
-    uint8_t  session_count;
-    uint32_t current_session_start;
-    uint32_t total_occupancy_ms;
-    uint32_t last_seen_ms;
-
-    // Analytics
-    uint32_t hourly_occupancy[HISTORY_BINS];  // seconds per hour slot
-    float    avg_distance_cm_session;
-
-    // Diagnostics
-    uint32_t packets_received;
-    uint32_t frame_errors;
-    bool     buffer_overflow;
-    uint32_t uptime_seconds;
-};
-
-// ================================================================================
-// GLOBALS
-// ================================================================================
-volatile bool     ot2_state       = false;
-volatile uint32_t last_ot2_ms     = 0;
-RadarState        radar            = {};
-HardwareSerial    radarSerial(1);
-WebServer         httpServer(80);
-WebSocketsServer  wsServer(81);
+ESP8266WebServer httpServer(80);
+WebSocketsServer wsServer(81);
 #if ENABLE_MQTT
-WiFiClient        wifiClient;
-PubSubClient      mqttClient(wifiClient);
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
 #endif
-Ticker            secondTicker;
 
-// ASCII ring buffer for web terminal
-uint8_t  snapBuf[SNAPSHOT_SIZE];
-uint16_t snapIdx = 0;
+uint32_t last_ws_ms = 0;
+#define WS_INTERVAL_MS 100 // 10Hz to match telemetry
 
-// Sensitivity thresholds (adjustable)
-uint16_t threshold_motion_cm  = 600;   // max motion detection range in cm
-uint16_t threshold_static_cm  = 400;   // max static detection range in cm
-uint8_t  sensitivity_level    = 5;     // 1-10
+uint32_t last_mqtt_ms = 0;
+#define MQTT_INTERVAL_MS 1000 
 
-// Temporal smoothing
-float    distance_ema_cm      = 0.0f;  // exponential moving average
-#define  EMA_ALPHA            0.2f
+void sendWebSocketUpdate() {
+    StaticJsonDocument<1024> doc;
+    AppLogic::getTelemetryJson(doc);
+    String output;
+    serializeJson(doc, output);
+    wsServer.broadcastTXT(output);
+}
 
-// State persistence timers
-uint32_t last_motion_ms       = 0;
-uint32_t last_static_ms       = 0;
-uint32_t state_start_ms       = 0;
-uint32_t last_mqtt_ms         = 0;
-uint32_t last_ws_ms           = 0;
-#define  MQTT_INTERVAL_MS     2000
-#define  WS_INTERVAL_MS       500  // Reduced from 200 to save CPU and reduce heap pressure
-#define  PRESENCE_TIMEOUT_MS  10000  // 10s no signal → empty
-
-// ================================================================================
-// FORWARD DECLARATIONS
-// ================================================================================
-void updatePresenceEngine();
-void updateZoneMap();
-void inferActivity();
-void calculateConfidences();
-void updateSession(bool present);
-void sendWebSocketUpdate();
+void mqttPublish() {
 #if ENABLE_MQTT
-void mqttPublish();
+    if(!mqttClient.connected()) return;
+    StaticJsonDocument<1024> doc;
+    AppLogic::getTelemetryJson(doc);
+    String output;
+    serializeJson(doc, output);
+    mqttClient.publish(String(String(MQTT_TOPIC_BASE) + "/state").c_str(), output.c_str(), true);
 #endif
-String buildJsonPayload(bool full = true);
-void handleApiData();
-void handleApiHex();
-void handleApiCmd();
-void handleApiThresholds();
+}
+
 void handleRoot();
 #if ENABLE_MQTT
 void mqttReconnect();
@@ -262,14 +129,7 @@ void secondISR();
 // ================================================================================
 // HARDWARE INTERRUPT — OT2 HARDWARE PIN
 // ================================================================================
-void ICACHE_RAM_ATTR handleOT2() {
-    uint32_t now = millis();
-    if (now - last_ot2_ms > 50) {
-        ot2_state = digitalRead(PIN_RADAR_OT2) == HIGH;
-        last_ot2_ms = now;
-        radar.presence_hardware = ot2_state;
-        if (ot2_state) radar.last_seen_ms = now;
-    }
+
 }
 
 void secondISR() {
@@ -988,12 +848,12 @@ void setup() {
     digitalWrite(PIN_LED, HIGH);  // LED off (active LOW)
 
     // OT2 interrupt
-    attachInterrupt(digitalPinToInterrupt(PIN_RADAR_OT2), handleOT2, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(PIN_RADAR_OT2), AppLogic::handleOT2, CHANGE);
     radar.presence_hardware = digitalRead(PIN_RADAR_OT2) == HIGH;
 
-    // Radar UART — HardwareSerial 1 (ESP32)
-    radarSerial.begin(RADAR_BAUD, SERIAL_8N1, PIN_RADAR_RX, PIN_RADAR_TX);
-    Serial.println("[RADAR] HardwareSerial started @ 115200");
+    // Radar UART — 256-byte buffer (reduced to save RAM)
+    radarSerial.begin(RADAR_BAUD, SWSERIAL_8N1, PIN_RADAR_RX, PIN_RADAR_TX, false, 256);
+    Serial.println("[RADAR] SoftwareSerial started @ 115200");
 
     // WiFiManager - Secure Captive Portal
     WiFiManager wifiManager;
@@ -1073,13 +933,62 @@ void loop() {
     MDNS.update();
     #endif
 
-    // Read radar UART
     while (radarSerial.available()) {
-        parser.feed(radarSerial.read());
+        AppLogic::parser.feed((uint8_t)radarSerial.read());
     }
-    radar.buffer_overflow = radarSerial.overflow();
 
-    // MQTT periodic publish
+    uint32_t now = millis();
+    AppLogic::checkPresenceTimeout();
+
+    if (now - AppLogic::last_doppler_ms >= DOPPLER_ANALYZE_MS) {
+        AppLogic::last_doppler_ms = now;
+        AppLogic::runDopplerAnalysis();
+    }
+
+    if (now - AppLogic::last_breathing_ms >= BREATHING_ANALYZE_MS) {
+        AppLogic::last_breathing_ms = now;
+        AppLogic::runBioVitalAnalysis();
+    }
+
+    AppLogic::manageFallAlert();
+
+    if (now - AppLogic::last_broadcast_ms >= TELEMETRY_MS) {
+        AppLogic::last_broadcast_ms = now;
+        AppLogic::runPresenceFusion();
+        AppLogic::runActivityClassification();
+
+        if (!AppLogic::radar.presence_fused) {
+            AppLogic::occupancy.update(0, false);
+            for (int z = 0; z < UltimateDSP::OccupancyGridEngine::ZONES; z++)
+                AppLogic::radar.zone_prob[z] = AppLogic::occupancy.getProbability(z);
+        }
+
+        if(AppLogic::radar.presence_fused) {
+            AppLogic::radar.posture_class = AppLogic::svm_posture.predict(AppLogic::radar.kalman_innovation, 100.0);
+            AppLogic::radar.pet_detected = AppLogic::dt_pet.isPet(50.0, AppLogic::radar.velocity_cm_s, 20.0);
+            AppLogic::rl_tuner.step(AppLogic::kalman, AppLogic::radar.kalman_innovation);
+            AppLogic::isolation_forest.update(abs(AppLogic::radar.velocity_cm_s));
+            AppLogic::radar.anomaly_score = AppLogic::isolation_forest.anomaly_score;
+            AppLogic::sleep_stager.update(AppLogic::radar.breathing_rate_bpm, AppLogic::radar.breathing_valid);
+            AppLogic::radar.sleep_stage = AppLogic::sleep_stager.current_stage;
+            AppLogic::intent_engine.update(AppLogic::radar.range_cm, AppLogic::radar.velocity_cm_s);
+            AppLogic::radar.intent_leaving = AppLogic::intent_engine.intention_to_leave;
+            AppLogic::radar.voice_prime = (abs(AppLogic::radar.velocity_cm_s) < 5.0 && AppLogic::radar.range_cm < 100.0);
+        } else {
+            AppLogic::radar.posture_class = 0;
+            AppLogic::radar.pet_detected = false;
+            AppLogic::radar.anomaly_score = 0;
+            AppLogic::radar.sleep_stage = 0;
+            AppLogic::radar.intent_leaving = false;
+            AppLogic::radar.voice_prime = false;
+        }
+
+        sendWebSocketUpdate();
+        AppLogic::blinkLED();
+    }
+
+    AppLogic::updateLED();
+
     #if ENABLE_MQTT
     if (millis() - last_mqtt_ms > MQTT_INTERVAL_MS) {
         last_mqtt_ms = millis();
@@ -1089,16 +998,6 @@ void loop() {
         }
     }
     #endif
-
-    // WebSocket periodic push
-    if (millis() - last_ws_ms > WS_INTERVAL_MS) {
-        last_ws_ms = millis();
-        sendWebSocketUpdate();
-    }
-
-    // LED = presence indicator
-    bool present = radar.presence_serial || radar.presence_hardware;
-    digitalWrite(PIN_LED, present ? LOW : HIGH);
 
     yield();
 }

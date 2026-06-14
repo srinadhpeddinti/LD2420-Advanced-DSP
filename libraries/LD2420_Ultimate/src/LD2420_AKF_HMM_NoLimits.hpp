@@ -19,6 +19,9 @@
 
 #pragma once
 #include <math.h>
+#if defined(ARDUINO_ARCH_RP2040) || defined(ARDUINO_ARCH_STM32)
+#include <arm_math.h>
+#endif
 #include <stdint.h>
 #include <string.h>
 
@@ -293,19 +296,16 @@ public:
   bool initialized;
   uint32_t update_count;
 
+  static constexpr double A_INIT[HMM_STATES][HMM_STATES] = {
+      {0.950, 0.020, 0.015, 0.010, 0.004, 0.001},
+      {0.005, 0.900, 0.070, 0.020, 0.005, 0.000},
+      {0.005, 0.020, 0.880, 0.070, 0.022, 0.003},
+      {0.005, 0.005, 0.060, 0.870, 0.055, 0.005},
+      {0.005, 0.002, 0.015, 0.060, 0.880, 0.038},
+      {0.005, 0.000, 0.005, 0.020, 0.080, 0.890}
+  };
+
   MarkovActivityEngine() : initialized(false), update_count(0) {
-    // Realistic person-presence transition matrix:
-    // Rows = from state, Cols = to state
-    // Diagonal dominates (people don't switch state every 100ms)
-    static const double A_INIT[HMM_STATES][HMM_STATES] = {
-        // AB      SL      SI      ST      WK      RN
-        {0.950, 0.020, 0.015, 0.010, 0.004, 0.001}, // ABSENT
-        {0.005, 0.900, 0.070, 0.020, 0.005, 0.000}, // SLEEPING
-        {0.005, 0.020, 0.880, 0.070, 0.022, 0.003}, // SITTING
-        {0.005, 0.005, 0.060, 0.870, 0.055, 0.005}, // STANDING
-        {0.005, 0.002, 0.015, 0.060, 0.880, 0.038}, // WALKING
-        {0.005, 0.000, 0.005, 0.020, 0.080, 0.890}, // RUNNING
-    };
     memcpy(A, A_INIT, sizeof(A));
 
     // Equal prior (will adapt)
@@ -1161,3 +1161,187 @@ public:
 };
 
 } // namespace UltimateDSP
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 10. PHASE 2: EDGE AI & MACHINE LEARNING (UltimateML)
+// ─────────────────────────────────────────────────────────────────────────────
+namespace UltimateML {
+
+// 1. Support Vector Machine (Posture Classification)
+// Classifies: 0=Standing, 1=Sitting, 2=Prone
+class SupportVectorMachine {
+public:
+    static constexpr int FEATURES = 2; // [Range Variance, Target RCS Energy]
+    static constexpr int NUM_SV = 5;   // Number of Support Vectors per class
+    double sv[3][NUM_SV][FEATURES];
+    double alphas[3][NUM_SV];
+    double intercepts[3];
+    double gamma = 0.5; // RBF Kernel parameter
+    
+    SupportVectorMachine() {
+        // Initialize heuristic support vectors since no offline dataset exists yet
+        intercepts[0] = -1.0; intercepts[1] = -0.5; intercepts[2] = 0.5;
+        for(int c=0; c<3; c++) {
+            for(int i=0; i<NUM_SV; i++) {
+                sv[c][i][0] = (c == 0) ? 10.0 : ((c == 1) ? 5.0 : 2.0); // Variance
+                sv[c][i][1] = (c == 0) ? 100.0 : ((c == 1) ? 50.0 : 10.0); // RCS
+                alphas[c][i] = 0.2;
+            }
+        }
+    }
+    
+    int predict(double variance, double rcs) {
+        double x[FEATURES] = {variance, rcs};
+        double best_score = -1e9;
+        int best_class = 0;
+        
+        for(int c=0; c<3; c++) {
+            double score = intercepts[c];
+            for(int i=0; i<NUM_SV; i++) {
+                double dist_sq = 0;
+                for(int f=0; f<FEATURES; f++) {
+                    double d = x[f] - sv[c][i][f];
+                    dist_sq += d * d;
+                }
+                double kernel_val = exp(-gamma * dist_sq);
+                score += alphas[c][i] * kernel_val;
+            }
+            if(score > best_score) { best_score = score; best_class = c; }
+        }
+        return best_class;
+    }
+};
+
+// 2. Decision Tree Classifier (Pet vs Human)
+class DecisionTreeClassifier {
+public:
+    // Simple Embedded CART tree representation
+    bool isPet(double height_estimate_cm, double avg_velocity, double target_rcs) {
+        if(target_rcs < 30.0) {
+            if(avg_velocity > 100.0) return true; // Fast small object -> Dog/Cat
+            else return false; // Slow small object -> Clutter/Fan
+        } else {
+            return false; // Large RCS -> Human
+        }
+    }
+};
+
+// 3. Reinforcement Learning Tuner (Autonomous Kalman matrix tuner)
+class ReinforcementTuner {
+public:
+    double learning_rate = 0.01;
+    double smoothed_innovation_sq = 0;
+    
+    void step(UltimateDSP::AdaptiveKalmanFilter& filter, double innovation) {
+        // Simple Policy Gradient proxy: Shift R/Q based on innovation magnitude
+        double innov_sq = innovation * innovation;
+        smoothed_innovation_sq = 0.9 * smoothed_innovation_sq + 0.1 * innov_sq;
+        
+        if(smoothed_innovation_sq > filter.sigma_r * 2) {
+            // Reward: Expanding R (measurement noise) reduces innovation spikes
+            filter.sigma_r += learning_rate * filter.sigma_r;
+        } else if (smoothed_innovation_sq < filter.sigma_r * 0.5) {
+            filter.sigma_r -= learning_rate * filter.sigma_r;
+        }
+        
+        // Boundaries to prevent filter collapse
+        if(filter.sigma_r < 1.0) filter.sigma_r = 1.0;
+        if(filter.sigma_r > 500.0) filter.sigma_r = 500.0;
+    }
+};
+
+// 4. Isolation Forest (Anomaly Detection for Elderly Care)
+class IsolationForest {
+public:
+    double moving_avg = 0;
+    double moving_var = 0;
+    double anomaly_score = 0;
+    
+    void update(double velocity_magnitude) {
+        // Simplified embedded anomaly score (Standard Score proxy)
+        moving_avg = 0.95 * moving_avg + 0.05 * velocity_magnitude;
+        double diff = velocity_magnitude - moving_avg;
+        moving_var = 0.95 * moving_var + 0.05 * (diff * diff);
+        
+        double stddev = sqrt(moving_var) + 1e-3;
+        double z_score = fabs(diff) / stddev;
+        
+        // Sigmoid mapping for anomaly 0-1
+        anomaly_score = 1.0 / (1.0 + exp(-1.0 * (z_score - 3.0))); 
+    }
+};
+
+// 5. Sleep Stage Classification
+class SleepStager {
+public:
+    // Stages: 0=Awake, 1=Light, 2=Deep, 3=REM
+    int current_stage = 0;
+    double brv_moving_avg = 0; // Breathing Rate Variability
+    
+    void update(double breath_rate, bool valid) {
+        if(!valid) { current_stage = 0; return; }
+        
+        double diff = fabs(breath_rate - 15.0); // Baseline human BR
+        brv_moving_avg = 0.9 * brv_moving_avg + 0.1 * diff;
+        
+        if(brv_moving_avg > 3.0) current_stage = 3; // REM (highly erratic breathing)
+        else if(brv_moving_avg > 1.5) current_stage = 1; // Light sleep
+        else current_stage = 2; // Deep sleep (very steady breathing)
+    }
+    
+    const char* getStageString() const {
+        switch(current_stage) {
+            case 1: return "Light";
+            case 2: return "Deep";
+            case 3: return "REM";
+            default: return "Awake";
+        }
+    }
+};
+
+// 6. Predictive Intent Engine
+class IntentPredictor {
+public:
+    bool intention_to_leave = false;
+    double door_zone_range = 500.0; // cm (Example door location)
+    
+    void update(double range, double velocity) {
+        if(velocity > 50.0 && range > (door_zone_range - 150.0)) {
+            intention_to_leave = true;
+        } else if (velocity <= 0 || range < (door_zone_range - 200.0)) {
+            intention_to_leave = false;
+        }
+    }
+};
+
+// 7. Federated Learning HMM synchronizer
+class FederatedHMM {
+public:
+    void mergeWeights(double local_P[UltimateDSP::HMM_STATES][UltimateDSP::HMM_STATES],
+                      double remote_P[UltimateDSP::HMM_STATES][UltimateDSP::HMM_STATES]) {
+        // Average matrices and re-normalize
+        for(int i=0; i<UltimateDSP::HMM_STATES; i++) {
+            double sum = 0;
+            for(int j=0; j<UltimateDSP::HMM_STATES; j++) {
+                local_P[i][j] = (local_P[i][j] + remote_P[i][j]) * 0.5;
+                sum += local_P[i][j];
+            }
+            for(int j=0; j<UltimateDSP::HMM_STATES; j++) local_P[i][j] /= sum;
+        }
+    }
+};
+
+// 8. TensorFlow Lite CNN Fall-Detection Stub
+class TFLiteCNN_Fall {
+public:
+    bool is_initialized = false;
+    // float input_tensor[128]; // Raw velocity buffer (12.8s at 10Hz)
+    
+    bool predictFall(double current_velocity) {
+        // This is a stub for the future `tflite::MicroInterpreter` integration.
+        // Currently returns false.
+        return false;
+    }
+};
+
+} // namespace UltimateML

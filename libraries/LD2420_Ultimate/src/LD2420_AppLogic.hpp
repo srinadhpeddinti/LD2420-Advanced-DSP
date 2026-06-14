@@ -1,64 +1,87 @@
-/*
- * =====================================================================================
- * LD2420 TEENSY ULTIMATE v6.0 — TRUE DETECTION FIRMWARE
- * Hardware : Teensy 4.0 / 4.1 (NXP i.MX RT1062 Cortex-M7 @ 600MHz)
- * Compiler : Teensyduino
- * DSP Stack: Singer-AKF · Viterbi-HMM · Goertzel-Breath · Jerk-Fall · DS-Fusion
- *
- * ZERO MOCK CODE. ALL ALGORITHMS ARE MATHEMATICALLY GROUNDED.
- * =====================================================================================
- *
- * PIN MAP:
- *   GP0  — UART0 TX → LD2420 RX  (radar command channel, 115200 baud)
- *   GP1  — UART0 RX ← LD2420 TX  (radar ASCII output, 115200 baud)
- *   GP2  — LD2420 OT2 hardware presence GPIO (interrupt-driven)
- *   GP3  — Onboard LED (activity indicator)
- *   USB  — CDC Serial → Dashboard (JSON telemetry at 10 Hz)
- *
- * LD2420 WIRING:
- *   LD2420 5V  → Pico VBUS
- *   LD2420 GND → Pico GND
- *   LD2420 TX  → GP1
- *   LD2420 RX  → GP0
- *   LD2420 OT2 → GP2
- *
- * KNOWN HARDWARE LIMITS (see README):
- *   • Max reliable range : ~800 cm (8 m)
- *   • Breathing detection : requires person stationary > 15 sec, range < 150 cm
- *   • Heart-rate detection: range < 80 cm, person must be very still
- *   • Fall detection      : 60–70% sensitivity (false-negative on slow falls)
- *   • Range precision     : ±2 cm after Kalman smoothing
- *   • Angular resolution  : none (single-axis monostatic radar — no angle data)
- *   • Multi-person        : detects strongest reflector only
- * =====================================================================================
- */
+#pragma once
 
 #include "LD2420_AKF_HMM_NoLimits.hpp"
 #include <ArduinoJson.h>
 
-// ─────────────────────────────────────────────────────────────────────────────
-// COMPILE-TIME CONFIGURATION
-// ─────────────────────────────────────────────────────────────────────────────
-#define PIN_RADAR_TX 0
-#define PIN_RADAR_RX 1
-#define PIN_RADAR_OT2 2
-#define PIN_LED 3       // optional LED
-#define TELEMETRY_HZ 10 // USB JSON broadcast rate
-#define TELEMETRY_MS (1000 / TELEMETRY_HZ)
-#define BREATHING_ANALYZE_MS 2000   // run breath FFT every 2 sec
-#define DOPPLER_ANALYZE_MS 1000     // run Doppler cadence every 1 sec
-#define FALL_ALERT_HOLD_MS 5000     // keep fall alert in JSON for 5 sec
-#define OT2_DEBOUNCE_MS 50          // hardware interrupt debounce
-#define RANGE_SANITY_MAX_CM 800     // reject out-of-range readings
-#define RANGE_SANITY_MIN_CM 5       // reject implausibly close readings
-#define VELOCITY_OUTLIER_M_DIST 4.0 // Mahalanobis threshold for spike rejection
-#define PRESENCE_TIMEOUT_MS 5000    // clear serial presence after 5 sec silence
-#define STATIC_DETECT_VEL_CM 15     // cm/s threshold for "person is stationary"
-#define LED_BLINK_MS 100            // LED on-time per packet
+#include <LittleFS.h>
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DSP ENGINE INSTANCES
-// ─────────────────────────────────────────────────────────────────────────────
+#pragma pack(push, 1)
+struct TelemetryPacket {
+    uint16_t magic; // 0xBEEF
+    uint8_t presence;
+    uint8_t activity;
+    int16_t range_cm;
+    int16_t velocity_cm_s;
+    float accel_cm_s2;
+    float jerk_cm_s3;
+    float cadence_hz;
+    float breathing_bpm;
+    float heart_rate_bpm;
+    uint8_t posture_class;
+    uint8_t sleep_stage;
+    uint8_t anomaly_score; // 0-255 mapped from 0.0-1.0
+    uint8_t intent_leaving;
+    uint8_t voice_prime;
+    uint8_t zones[8]; // 0-255 mapped from 0.0-1.0
+    uint32_t uptime_s;
+    uint16_t checksum;
+};
+#pragma pack(pop)
+
+inline void getTelemetryBinary(TelemetryPacket& pkt) {
+    pkt.magic = 0xBEEF;
+    pkt.presence = radar.presence_fused ? 1 : 0;
+    pkt.activity = (uint8_t)radar.activity;
+    pkt.range_cm = radar.range_cm;
+    pkt.velocity_cm_s = radar.velocity_cm_s;
+    pkt.accel_cm_s2 = radar.accel_cm_s2;
+    pkt.jerk_cm_s3 = radar.jerk_cm_s3;
+    pkt.cadence_hz = radar.cadence_hz;
+    pkt.breathing_bpm = radar.breathing_rate_bpm;
+    pkt.heart_rate_bpm = radar.heart_rate_bpm;
+    pkt.posture_class = radar.posture_class;
+    pkt.sleep_stage = radar.sleep_stage;
+    pkt.anomaly_score = (uint8_t)(radar.anomaly_score * 255.0);
+    pkt.intent_leaving = radar.intent_leaving ? 1 : 0;
+    pkt.voice_prime = radar.voice_prime ? 1 : 0;
+    for(int i=0; i<8; i++) pkt.zones[i] = (uint8_t)(radar.zone_prob[i] * 255.0);
+    pkt.uptime_s = radar.uptime_s;
+    
+    // simple checksum
+    uint16_t cs = 0;
+    uint8_t* ptr = (uint8_t*)&pkt;
+    for(size_t i=0; i<sizeof(TelemetryPacket)-2; i++) {
+        cs += ptr[i];
+    }
+    pkt.checksum = cs;
+}
+
+inline void logActivityTransition(UltimateDSP::HMMState old_state, UltimateDSP::HMMState new_state) {
+    if(LittleFS.begin()) {
+        File f = LittleFS.open("/activity_log.txt", "a");
+        if(f) {
+            f.printf("[%lu] TRANSITION: %s -> %s\n", millis(), UltimateDSP::hmmStateName(old_state), UltimateDSP::hmmStateName(new_state));
+            f.close();
+        }
+    }
+}
+
+
+#define TELEMETRY_HZ 10 
+#define TELEMETRY_MS (1000 / TELEMETRY_HZ)
+#define BREATHING_ANALYZE_MS 2000   
+#define DOPPLER_ANALYZE_MS 1000     
+#define FALL_ALERT_HOLD_MS 5000     
+#define OT2_DEBOUNCE_MS 50          
+#define RANGE_SANITY_MAX_CM 800     
+#define RANGE_SANITY_MIN_CM 5       
+#define VELOCITY_OUTLIER_M_DIST 4.0 
+#define PRESENCE_TIMEOUT_MS 5000    
+#define STATIC_DETECT_VEL_CM 15     
+#define LED_BLINK_MS 100            
+
+namespace AppLogic {
+
 UltimateDSP::AdaptiveKalmanFilter kalman(0.0);
 UltimateDSP::MarkovActivityEngine markov;
 UltimateDSP::FrequencyDopplerEngine doppler(1.0 / TELEMETRY_HZ);
@@ -67,6 +90,15 @@ UltimateDSP::FallDetector falldet;
 UltimateDSP::BreathingEstimator breather(1.0 / TELEMETRY_HZ);
 UltimateDSP::TangentialMotionEngine tangential;
 UltimateDSP::SignalQualityMonitor sqmon;
+
+// ML Engines
+UltimateML::SupportVectorMachine svm_posture;
+UltimateML::DecisionTreeClassifier dt_pet;
+UltimateML::ReinforcementTuner rl_tuner;
+UltimateML::IsolationForest isolation_forest;
+UltimateML::SleepStager sleep_stager;
+UltimateML::IntentPredictor intent_engine;
+UltimateML::FederatedHMM federated_hmm;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RADAR STATE — SINGLE SOURCE OF TRUTH
@@ -103,6 +135,14 @@ struct RadarState {
   double breathing_rate_bpm;
   double breathing_amplitude_cm;
   double heart_rate_bpm;
+
+  // ML & Edge AI Output
+  int posture_class;          // 0=Stand, 1=Sit, 2=Prone
+  bool pet_detected;          
+  double anomaly_score;       // 0.0 - 1.0
+  int sleep_stage;            // 0=Awake, 1=Light, 2=Deep, 3=REM
+  bool intent_leaving;        // Predictive door exit
+  bool voice_prime;           // Wake-word attention mechanism
 
   // Zone occupancy
   double zone_prob[UltimateDSP::OccupancyGridEngine::ZONES];
@@ -307,7 +347,7 @@ AsciiProtocolParser parser;
 // If no "Range" or "ON" has been received for PRESENCE_TIMEOUT_MS, we clear
 // serial presence to avoid stale presence being reported.
 // ─────────────────────────────────────────────────────────────────────────────
-void checkPresenceTimeout() {
+inline void checkPresenceTimeout() {
   uint32_t now = millis();
   if (radar.presence_serial &&
       (now - radar.last_seen_ms > PRESENCE_TIMEOUT_MS)) {
@@ -329,7 +369,7 @@ void checkPresenceTimeout() {
 //   3. Jerk spike just occurred + low velocity → freeze WALKING label
 //   4. Normal: Viterbi/forward decoded HMM state
 // ─────────────────────────────────────────────────────────────────────────────
-void runActivityClassification() {
+inline void runActivityClassification() {
   bool present = radar.presence_fused;
   int32_t abs_vel = abs(radar.velocity_cm_s);
   double accel = radar.accel_cm_s2;
@@ -366,7 +406,8 @@ void runActivityClassification() {
   }
 
   // State transition: reset state timer if state changed
-  if (decoded != radar.activity) {
+    if (decoded != radar.activity) {
+    logActivityTransition(radar.activity, decoded);
     radar.state_start_ms = millis();
   }
   radar.activity = decoded;
@@ -375,7 +416,7 @@ void runActivityClassification() {
 // ─────────────────────────────────────────────────────────────────────────────
 // PRESENCE FUSION PIPELINE
 // ─────────────────────────────────────────────────────────────────────────────
-void runPresenceFusion() {
+inline void runPresenceFusion() {
   uint32_t now = millis();
   uint32_t ms_since_ot2 = now - ot2_last_ms;
 
@@ -399,7 +440,7 @@ void runPresenceFusion() {
 //  - Range is < 150 cm
 //  - At least 5 seconds of presence
 // ─────────────────────────────────────────────────────────────────────────────
-void runBioVitalAnalysis() {
+inline void runBioVitalAnalysis() {
   bool stationary = (abs(radar.velocity_cm_s) < STATIC_DETECT_VEL_CM);
   bool close = (radar.range_cm > 0 && radar.range_cm < 150);
   bool long_enough = (millis() - radar.presence_start_ms) > 5000;
@@ -418,7 +459,7 @@ void runBioVitalAnalysis() {
 // ─────────────────────────────────────────────────────────────────────────────
 // DOPPLER CADENCE ANALYSIS
 // ─────────────────────────────────────────────────────────────────────────────
-void runDopplerAnalysis() {
+inline void runDopplerAnalysis() {
   bool walking = (radar.activity == UltimateDSP::WALKING ||
                   radar.activity == UltimateDSP::RUNNING);
   if (walking && radar.presence_fused) {
@@ -431,7 +472,7 @@ void runDopplerAnalysis() {
 // ─────────────────────────────────────────────────────────────────────────────
 // FALL ALERT HOLD
 // ─────────────────────────────────────────────────────────────────────────────
-void manageFallAlert() {
+inline void manageFallAlert() {
   if (radar.fall_detected &&
       (millis() - radar.fall_time_ms) > FALL_ALERT_HOLD_MS) {
     radar.fall_detected = false; // clear after hold window
@@ -441,7 +482,7 @@ void manageFallAlert() {
 // ─────────────────────────────────────────────────────────────────────────────
 // LED INDICATOR
 // ─────────────────────────────────────────────────────────────────────────────
-void updateLED() {
+inline void updateLED() {
   if (radar.fall_detected) {
     // Fast blink for fall alert
     digitalWrite(PIN_LED, (millis() / 200) % 2 == 0);
@@ -457,7 +498,7 @@ void updateLED() {
   }
 }
 
-void blinkLED() {
+inline void blinkLED() {
   digitalWrite(PIN_LED, HIGH);
   led_off_ms = millis() + LED_BLINK_MS;
 }
@@ -504,9 +545,9 @@ void blinkLED() {
 //   outliers            — Mahalanobis-rejected range spikes
 //   uptime_s            — system uptime in seconds
 // ─────────────────────────────────────────────────────────────────────────────
-void broadcastTelemetry() {
+inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
   // 1024 bytes is enough for this schema (~600 bytes serialized)
-  StaticJsonDocument<1024> doc;
+  
 
   uint32_t now = millis();
   radar.uptime_s = now / 1000;
@@ -544,6 +585,14 @@ void broadcastTelemetry() {
   doc["breathing_amp_cm"] = serialized(String(radar.breathing_amplitude_cm, 2));
   doc["heart_rate_bpm"] = serialized(String(radar.heart_rate_bpm, 1));
 
+  // ── Edge AI & Machine Learning ───────────────────────────────────────────
+  doc["ml_posture"] = (radar.posture_class == 0) ? "Standing" : ((radar.posture_class == 1) ? "Sitting" : "Prone");
+  doc["ml_pet_detected"] = radar.pet_detected;
+  doc["ml_anomaly_score"] = serialized(String(radar.anomaly_score, 3));
+  doc["ml_sleep_stage"] = sleep_stager.getStageString();
+  doc["intent_leaving"] = radar.intent_leaving;
+  doc["voice_prime"] = radar.voice_prime;
+
   // ── Fall Detection ───────────────────────────────────────────────────────
   doc["fall_detected"] = radar.fall_detected;
   doc["fall_time_ms"] = radar.fall_time_ms;
@@ -580,93 +629,9 @@ void broadcastTelemetry() {
   doc["uptime_s"] = radar.uptime_s;
 
   // Emit NDJSON to USB host
-  serializeJson(doc, Serial);
-  Serial.println();
+  
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SETUP
-// ─────────────────────────────────────────────────────────────────────────────
-void setup() {
-  // USB-CDC serial (telemetry out)
-  Serial.begin(115200);
 
-  // LD2420 hardware UART on UART0 (GP0/GP1)
-  Serial1.setTX(PIN_RADAR_TX);
-  Serial1.setRX(PIN_RADAR_RX);
-  Serial1.begin(115200);
-
-  // OT2 hardware presence interrupt
-  pinMode(PIN_RADAR_OT2, INPUT);
-  attachInterrupt(digitalPinToInterrupt(PIN_RADAR_OT2), handleOT2, CHANGE);
-
-  // LED output
-  pinMode(PIN_LED, OUTPUT);
-  digitalWrite(PIN_LED, LOW);
-
-  // Zero radar state
-  memset(&radar, 0, sizeof(radar));
-
-  // Brief boot indication: 3 fast blinks
-  for (int i = 0; i < 3; i++) {
-    digitalWrite(PIN_LED, HIGH);
-    delay(80);
-    digitalWrite(PIN_LED, LOW);
-    delay(80);
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MAIN LOOP
-// ─────────────────────────────────────────────────────────────────────────────
-void loop() {
-  // ── 1. Drain the UART FIFO as fast as possible (highest priority) ────────
-  while (Serial1.available()) {
-    parser.feed((uint8_t)Serial1.read());
-  }
-
-  uint32_t now = millis();
-
-  // ── 2. Presence timeout watchdog ─────────────────────────────────────────
-  checkPresenceTimeout();
-
-  // ── 3. Periodic Doppler cadence analysis (1 Hz) ───────────────────────────
-  if (now - last_doppler_ms >= DOPPLER_ANALYZE_MS) {
-    last_doppler_ms = now;
-    runDopplerAnalysis();
-  }
-
-  // ── 4. Periodic breathing analysis (0.5 Hz) ───────────────────────────────
-  if (now - last_breathing_ms >= BREATHING_ANALYZE_MS) {
-    last_breathing_ms = now;
-    runBioVitalAnalysis();
-  }
-
-  // ── 5. Fall alert hold management ────────────────────────────────────────
-  manageFallAlert();
-
-  // ── 6. 10 Hz telemetry tick ──────────────────────────────────────────────
-  if (now - last_broadcast_ms >= TELEMETRY_MS) {
-    last_broadcast_ms = now;
-
-    // a. Fuse presence evidence (DS + HMM + HW)
-    runPresenceFusion();
-
-    // b. Run activity HMM
-    runActivityClassification();
-
-    // c. Update occupancy grid for absent case
-    if (!radar.presence_fused) {
-      occupancy.update(0, false);
-      for (int z = 0; z < UltimateDSP::OccupancyGridEngine::ZONES; z++)
-        radar.zone_prob[z] = occupancy.getProbability(z);
-    }
-
-    // d. Emit telemetry JSON to USB
-    broadcastTelemetry();
-    blinkLED();
-  }
-
-  // ── 7. LED management ─────────────────────────────────────────────────────
-  updateLED();
-}
+} // namespace AppLogic

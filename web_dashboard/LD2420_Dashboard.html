@@ -739,6 +739,21 @@ input[type=range]::-webkit-slider-thumb {
       </div>
     </div>
 
+    <!-- Edge AI / Machine Learning Output -->
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">Edge AI & ML Output</span></div>
+      <div class="panel-body" style="padding:8px 16px;">
+        <div class="status-list">
+          <div class="status-row"><span class="status-key">SVM Posture Class</span><span class="status-val" id="ml-posture" style="color:var(--amber-300)">—</span></div>
+          <div class="status-row"><span class="status-key">Pet / Clutter</span><span id="ml-pet" class="badge badge-ok">HUMAN</span></div>
+          <div class="status-row"><span class="status-key">Isolation Forest Anomaly</span><span class="status-val" id="ml-anomaly" style="color:var(--teal-300)">0.00</span></div>
+          <div class="status-row"><span class="status-key">BRV Sleep Stage</span><span class="status-val" id="ml-sleep" style="color:var(--blue-400)">Awake</span></div>
+          <div class="status-row"><span class="status-key">Predictive Intent</span><span id="ml-intent" class="badge badge-off">IDLE</span></div>
+          <div class="status-row"><span class="status-key">Voice Assistant Trigger</span><span id="ml-voice" class="badge badge-off">IDLE</span></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Serial Terminal -->
     <div class="panel">
       <div class="panel-head">
@@ -1123,6 +1138,16 @@ function render(d) {
       for (let i = 0; i < 6; i++) {
           set('hmm-' + i, (d.markov[i] * 100).toFixed(1) + '%');
       }
+  }
+
+  // Edge AI Updates
+  if (d.ml_posture !== undefined) {
+      set('ml-posture', d.ml_posture);
+      setBadge('ml-pet', d.ml_pet_detected, 'PET / CLUTTER', 'HUMAN', 'badge-warn', 'badge-ok');
+      set('ml-anomaly', parseFloat(d.ml_anomaly_score || 0).toFixed(3));
+      set('ml-sleep', d.ml_sleep_stage || 'Awake');
+      setBadge('ml-intent', d.intent_leaving, 'LEAVING DOOR', 'IDLE', 'badge-warn', 'badge-off');
+      setBadge('ml-voice', d.voice_prime, 'LISTENING', 'IDLE', 'badge-ok', 'badge-off');
   }
 
   // Zone map

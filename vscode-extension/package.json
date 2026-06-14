@@ -1,0 +1,21 @@
+{
+  "name": "ld2420-telemetry",
+  "displayName": "LD2420 Telemetry Dashboard",
+  "description": "Live visualization of LD2420 radar JSON data inside VSCode",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ld2420.startDashboard",
+        "title": "LD2420: Start Live Dashboard"
+      }
+    ]
+  }
+}

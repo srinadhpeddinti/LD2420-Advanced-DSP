@@ -1,0 +1,10 @@
+PROJECT_NAME           = "LD2420 Ultimate Firmware"
+PROJECT_BRIEF          = "Advanced DSP and ML algorithms for FMCW radar presence tracking"
+OUTPUT_DIRECTORY       = docs
+INPUT                  = .
+FILE_PATTERNS          = *.hpp *.ino *.cpp
+RECURSIVE              = YES
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+EXTRACT_ALL            = YES
+OPTIMIZE_OUTPUT_FOR_C  = YES

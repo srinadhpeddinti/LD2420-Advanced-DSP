@@ -1,0 +1,49 @@
+name: LD2420 CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Compile LD2420_Pico_Ultimate.ino
+      uses: arduino/compile-sketches@v1
+      with:
+        fqbn: "rp2040:rp2040:rp2040"
+        platforms: |
+          - name: "rp2040:rp2040"
+            source-url: "https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json"
+        libraries: |
+          - name: ArduinoJson
+          - source-path: "./libraries/LD2420_Ultimate"
+        sketch-paths: |
+          - firmware/LD2420_Pico_Ultimate/LD2420_Pico_Ultimate.ino
+
+    - name: Upload UF2 Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: LD2420_Firmware
+        path: build/**/*.uf2
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install Catch2 and Valgrind
+      run: sudo apt-get update && sudo apt-get install -y cmake valgrind
+    - name: Build Tests
+      run: |
+        cd tests
+        mkdir build && cd build
+        cmake ..
+        make
+    - name: Run Tests with Valgrind
+      run: |
+        cd tests/build
+        valgrind --leak-check=full --error-exitcode=1 ./kalman_tests
