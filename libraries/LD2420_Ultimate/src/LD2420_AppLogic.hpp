@@ -80,6 +80,18 @@ inline void logActivityTransition(UltimateDSP::HMMState old_state, UltimateDSP::
 #define STATIC_DETECT_VEL_CM 15     
 #define LED_BLINK_MS 100            
 
+#if defined(ARDUINO_ARCH_RP2040)
+#include "pico/mutex.h"
+extern mutex_t radar_mutex;
+#define LOCK_RADAR()   mutex_enter_blocking(&radar_mutex)
+#define UNLOCK_RADAR() mutex_exit(&radar_mutex)
+#define VOLATILE_SHARED volatile
+#else
+#define LOCK_RADAR()
+#define UNLOCK_RADAR()
+#define VOLATILE_SHARED
+#endif
+
 namespace AppLogic {
 
 UltimateDSP::AdaptiveKalmanFilter kalman(0.0);
@@ -164,7 +176,7 @@ struct RadarState {
   uint32_t outliers; // Mahalanobis-rejected spikes
   uint32_t uptime_s;
 
-} radar;
+} VOLATILE_SHARED radar;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TIMING
@@ -186,8 +198,6 @@ void IRAM_ATTR handleOT2() {
   if (now - ot2_last_ms > OT2_DEBOUNCE_MS) {
     ot2_raw = (digitalRead(PIN_RADAR_OT2) == HIGH);
     ot2_last_ms = now;
-    if (ot2_raw)
-      radar.last_seen_ms = now;
   }
 }
 
@@ -430,6 +440,10 @@ inline void runPresenceFusion() {
   radar.presence_probability = (float)p_fused;
   radar.presence_fused = (p_fused >= 0.50);
   radar.presence_hw = ot2_raw;
+
+  if (ot2_raw) {
+    radar.last_seen_ms = ot2_last_ms;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

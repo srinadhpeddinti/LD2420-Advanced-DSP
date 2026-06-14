@@ -68,7 +68,7 @@ int uart_dma_chan;
 uint8_t __attribute__((aligned(256))) uart_ring_buffer[256];
 uint32_t uart_read_ptr = 0;
 
-
+mutex_t radar_mutex;
 
 void handleOT2() {
   uint32_t now = millis();
@@ -76,7 +76,6 @@ void handleOT2() {
     AppLogic::ot2_raw = (digitalRead(PIN_RADAR_OT2) == HIGH);
     AppLogic::ot2_last_ms = now;
     if (AppLogic::ot2_raw) {
-      AppLogic::radar.last_seen_ms = now;
       // Wake up from low power mode if applicable
       set_sys_clock_khz(133000, true);
     }
@@ -95,7 +94,9 @@ void loop1() {
         AppLogic::last_broadcast_ms = millis();
         
         AppLogic::TelemetryPacket pkt;
+        LOCK_RADAR();
         AppLogic::getTelemetryBinary(pkt);
+        UNLOCK_RADAR();
         
         Serial.write((const uint8_t*)&pkt, sizeof(AppLogic::TelemetryPacket));
         Serial.flush();
@@ -154,7 +155,8 @@ void setup() {
   pinMode(PIN_LED, OUTPUT);
   digitalWrite(PIN_LED, LOW);
 
-  memset(&AppLogic::radar, 0, sizeof(AppLogic::radar));
+  mutex_init(&radar_mutex);
+  memset((void*)&AppLogic::radar, 0, sizeof(AppLogic::radar));
 
   // Enable Watchdog Timer (2000ms)
   watchdog_enable(2000, 1);
@@ -184,6 +186,7 @@ void loop() {
 
 
   // DMA UART Parsing without CPU interrupts
+  LOCK_RADAR();
   uint32_t current_write_ptr = ((uint32_t)dma_hw->ch[uart_dma_chan].write_addr - (uint32_t)uart_ring_buffer);
   while (uart_read_ptr != current_write_ptr) {
     AppLogic::parser.feed(uart_ring_buffer[uart_read_ptr]);
@@ -249,4 +252,5 @@ void loop() {
   }
 
   AppLogic::updateLED();
+  UNLOCK_RADAR();
 }

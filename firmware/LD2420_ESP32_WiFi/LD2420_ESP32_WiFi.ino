@@ -60,7 +60,7 @@
 
 // Captive Portal AP Name
 const char* AP_SSID          = "LD2420_Setup";
-const char* AP_PASS          = "radar1234";
+const char* AP_PASS          = "YOUR_SETUP_PASSWORD";
 
 // MQTT (optional — set to "" to disable)
 #if ENABLE_MQTT
