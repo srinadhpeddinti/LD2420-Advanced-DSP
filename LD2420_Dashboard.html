@@ -1,0 +1,1657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LD2420 · Presence Intelligence Platform</title>
+<meta name="description" content="HLK-LD2420 24GHz FMCW radar real-time dashboard — 3D spatial mapping, presence detection, analytics.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   DESIGN SYSTEM — AEROSPACE RADAR AESTHETIC v5
+   ============================================================ */
+:root {
+  --bg-base:       #05070C;
+  --bg-surface:    #0A0D14;
+  --bg-raised:     #10151F;
+  --bg-hover:      #181E2A;
+  --border-dim:    rgba(255,255,255,0.06);
+  --border-mid:    rgba(255,255,255,0.11);
+  --border-bright: rgba(255,255,255,0.20);
+
+  --amber-300: #FFD97A;
+  --amber-400: #F5A623;
+  --amber-500: #D4881A;
+  --amber-dim:  rgba(245,166,35,0.10);
+  --amber-glow: rgba(245,166,35,0.22);
+
+  --teal-300:  #5DE8D8;
+  --teal-400:  #1DB8A8;
+  --teal-dim:  rgba(29,184,168,0.10);
+
+  --red-400:   #F5564A;
+  --red-dim:   rgba(245,86,74,0.13);
+  --green-400: #34D399;
+  --green-dim: rgba(52,211,153,0.10);
+  --blue-400:  #60A5FA;
+  --blue-dim:  rgba(96,165,250,0.10);
+  --purple-400:#A78BFA;
+
+  --text-100:  #EEF0F6;
+  --text-200:  #A8B0C0;
+  --text-300:  #616878;
+  --text-400:  #383D48;
+
+  --font-ui:   'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  --r-sm: 6px; --r-md: 10px; --r-lg: 16px; --r-xl: 20px;
+  --shadow-panel: 0 4px 24px rgba(0,0,0,0.5);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg-base);
+  color: var(--text-100);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+  padding: 16px 16px 60px;
+  background-image:
+    radial-gradient(ellipse 80% 40% at 50% 0%, rgba(245,166,35,0.05) 0%, transparent 60%),
+    radial-gradient(circle, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 100% 100%, 30px 30px;
+}
+
+/* ── HEADER ─────────────────────────────────────────────────── */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+}
+.header-brand { display: flex; align-items: center; gap: 14px; }
+.brand-icon {
+  width: 42px; height: 42px; border-radius: var(--r-md);
+  background: linear-gradient(135deg, rgba(245,166,35,0.15), rgba(245,166,35,0.05));
+  border: 1px solid rgba(245,166,35,0.4);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 20px rgba(245,166,35,0.15);
+}
+.brand-icon svg { width: 22px; height: 22px; }
+.brand-name { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; color: var(--text-100); }
+.brand-sub  { font-family: var(--font-mono); font-size: 10px; color: var(--text-300); margin-top: 2px; letter-spacing: 0.05em; }
+.header-right { display: flex; align-items: center; gap: 10px; }
+
+.conn-pill {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--bg-raised); border: 1px solid var(--border-mid);
+  border-radius: 100px; padding: 5px 12px;
+}
+.conn-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--text-400); transition: background 0.4s, box-shadow 0.4s;
+  flex-shrink: 0;
+}
+.conn-dot.live   { background: var(--green-400); box-shadow: 0 0 8px var(--green-400); }
+.conn-dot.warn   { background: var(--amber-400); box-shadow: 0 0 8px var(--amber-400); }
+.conn-dot.err    { background: var(--red-400);   box-shadow: 0 0 8px var(--red-400); }
+.conn-label { font-family: var(--font-mono); font-size: 11px; color: var(--text-300); }
+
+.unit-toggle {
+  display: flex; background: var(--bg-raised);
+  border: 1px solid var(--border-mid); border-radius: var(--r-md); padding: 3px; gap: 2px;
+}
+.unit-btn {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  padding: 4px 13px; border-radius: 7px; border: none;
+  background: transparent; color: var(--text-300); cursor: pointer; transition: all 0.15s;
+}
+.unit-btn.active { background: var(--amber-500); color: #fff; }
+.unit-btn:hover:not(.active) { background: var(--bg-hover); color: var(--text-100); }
+
+.uptime-badge {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-300);
+  background: var(--bg-raised); border: 1px solid var(--border-dim);
+  border-radius: var(--r-sm); padding: 5px 10px;
+}
+
+/* ── MAIN GRID ───────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  grid-template-rows: auto;
+  gap: 12px;
+  max-width: 1700px;
+  margin: 0 auto;
+}
+@media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
+.col-left  { display: flex; flex-direction: column; gap: 12px; }
+.col-right { display: flex; flex-direction: column; gap: 12px; }
+.full-row  { grid-column: 1 / -1; }
+
+/* ── PANEL ───────────────────────────────────────────────────── */
+.panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+  transition: border-color 0.3s;
+}
+.panel:hover { border-color: var(--border-mid); }
+.panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 18px 10px;
+  border-bottom: 1px solid var(--border-dim);
+}
+.panel-title {
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-300);
+}
+.panel-body { padding: 16px; }
+
+/* ── 3D RADAR MAP ────────────────────────────────────────────── */
+.radar3d-wrap {
+  position: relative; width: 100%;
+  height: 460px; background: #03050A;
+  border-radius: 0 0 var(--r-xl) var(--r-xl); overflow: hidden;
+}
+#radar3d-canvas { width: 100% !important; height: 100% !important; display: block; }
+.radar3d-hud {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none; padding: 14px;
+  display: flex; justify-content: space-between; align-items: flex-start;
+}
+.hud-left, .hud-right { display: flex; flex-direction: column; gap: 5px; }
+.hud-right { align-items: flex-end; }
+.hud-pill {
+  font-family: var(--font-mono); font-size: 11px;
+  background: rgba(5,7,12,0.80); border: 1px solid var(--border-mid);
+  border-radius: var(--r-sm); padding: 4px 10px;
+  backdrop-filter: blur(8px); color: var(--text-200);
+}
+.hud-pill span { color: var(--amber-300); }
+.hud-view-btns {
+  pointer-events: all;
+  display: flex; gap: 3px; background: rgba(5,7,12,0.80);
+  border: 1px solid var(--border-mid); border-radius: var(--r-sm);
+  padding: 3px; backdrop-filter: blur(8px);
+}
+.view-btn {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+  padding: 3px 8px; border-radius: 4px; border: none;
+  background: transparent; color: var(--text-300); cursor: pointer; transition: all 0.15s;
+}
+.view-btn.active { background: var(--amber-500); color: #fff; }
+.view-btn:hover:not(.active) { background: var(--bg-hover); color: var(--text-100); }
+.hud-legend {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  background: rgba(5,7,12,0.80); border: 1px solid var(--border-dim);
+  border-radius: var(--r-sm); padding: 6px 10px; backdrop-filter: blur(8px);
+}
+.legend-dot { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
+.legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-300); font-family: var(--font-mono); }
+
+/* ── RADAR SCOPE ─────────────────────────────────────────────── */
+.radar-scope {
+  position: relative; display: flex; flex-direction: column;
+  align-items: center; padding: 20px 16px 16px;
+}
+.scope-wrap { position: relative; width: 210px; height: 210px; }
+.scope-wrap canvas { width: 210px; height: 210px; }
+.scope-center {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  text-align: center; pointer-events: none;
+}
+.scope-dist-val {
+  font-family: var(--font-mono); font-size: 28px; font-weight: 400;
+  color: var(--amber-300); line-height: 1;
+}
+.scope-dist-unit { font-family: var(--font-mono); font-size: 10px; color: var(--text-300); margin-top: 1px; }
+.scope-state { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--text-200); margin-top: 10px; }
+
+/* ── PRESENCE HERO ───────────────────────────────────────────── */
+.pres-hero {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px; border-bottom: 1px solid var(--border-dim);
+}
+.pres-orb {
+  width: 54px; height: 54px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid var(--border-mid);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; transition: all 0.4s; position: relative;
+}
+.pres-orb.empty  { border-color: var(--text-400); color: var(--text-400); }
+.pres-orb.active {
+  border-color: var(--amber-400); color: var(--amber-300);
+  box-shadow: 0 0 0 6px var(--amber-dim), 0 0 24px rgba(245,166,35,0.2);
+}
+.pres-orb.active::before {
+  content: ''; position: absolute; inset: -8px; border-radius: 50%;
+  border: 1px solid rgba(245,166,35,0.25);
+  animation: pulse-ring 2s ease-out infinite;
+}
+@keyframes pulse-ring {
+  0%   { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.pres-info { flex: 1; min-width: 0; }
+.pres-state-name { font-size: 16px; font-weight: 600; color: var(--text-100); margin-bottom: 3px; }
+.pres-activity   { font-size: 12px; color: var(--amber-400); font-weight: 500; margin-bottom: 6px; }
+.pres-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+.chip {
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-300);
+  background: var(--bg-raised); border: 1px solid var(--border-dim);
+  border-radius: 4px; padding: 2px 6px;
+}
+.chip span { color: var(--amber-300); }
+.pres-session { text-align: right; flex-shrink: 0; }
+.session-label { font-family: var(--font-mono); font-size: 10px; color: var(--text-300); }
+.session-dur   { font-family: var(--font-mono); font-size: 18px; color: var(--text-100); }
+.session-count { font-family: var(--font-mono); font-size: 10px; color: var(--text-400); margin-top: 2px; }
+
+/* ── METRIC CARDS ────────────────────────────────────────────── */
+.metrics-row {
+  display: grid; grid-template-columns: repeat(4,1fr); gap: 8px;
+  padding: 14px;
+}
+@media (max-width: 800px) { .metrics-row { grid-template-columns: repeat(2,1fr); } }
+.metric-card {
+  background: var(--bg-raised); border: 1px solid var(--border-dim);
+  border-radius: var(--r-lg); padding: 12px 14px; position: relative; overflow: hidden;
+  transition: border-color 0.2s, transform 0.15s;
+}
+.metric-card:hover { border-color: var(--border-mid); transform: translateY(-1px); }
+.metric-card::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+  background: var(--mc-color, var(--amber-500));
+  width: var(--mc-pct, 0%); transition: width 0.4s ease; border-radius: 0 0 2px 2px;
+}
+.metric-lbl { font-size: 10px; color: var(--text-300); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
+.metric-val { font-family: var(--font-mono); font-size: 22px; font-weight: 400; color: var(--text-100); line-height: 1; }
+.metric-unit { font-size: 11px; color: var(--text-300); margin-left: 3px; }
+.metric-sub  { font-family: var(--font-mono); font-size: 10px; color: var(--text-400); margin-top: 4px; }
+
+/* ── GAUGES ──────────────────────────────────────────────────── */
+.gauge-list { display: flex; flex-direction: column; gap: 12px; }
+.gauge-item { display: flex; flex-direction: column; gap: 4px; }
+.gauge-hdr  { display: flex; justify-content: space-between; align-items: baseline; }
+.gauge-name { font-size: 12px; color: var(--text-200); }
+.gauge-val  { font-family: var(--font-mono); font-size: 13px; color: var(--text-100); }
+.gauge-track { height: 4px; background: var(--bg-raised); border-radius: 2px; overflow: hidden; }
+.gauge-fill  { height: 100%; border-radius: 2px; transition: width 0.35s ease; }
+
+/* ── ZONE MAP ────────────────────────────────────────────────── */
+.zone-list { display: flex; flex-direction: column; gap: 5px; }
+.zone-row {
+  display: grid; grid-template-columns: 60px 1fr 36px;
+  align-items: center; gap: 8px; padding: 3px 0;
+  border-radius: var(--r-sm); transition: background 0.15s;
+}
+.zone-row.active-zone { background: var(--amber-dim); padding: 3px 6px; margin: 0 -6px; }
+.zone-lbl { font-family: var(--font-mono); font-size: 10px; color: var(--text-400); }
+.zone-row.active-zone .zone-lbl { color: var(--amber-300); }
+.zone-track { height: 6px; background: var(--bg-raised); border-radius: 3px; overflow: hidden; position: relative; }
+.zone-fill  { height: 100%; border-radius: 3px; transition: width 0.3s ease; position: absolute; top: 0; left: 0; }
+.zone-pct   { font-family: var(--font-mono); font-size: 10px; color: var(--text-300); text-align: right; }
+.zone-row.active-zone .zone-pct { color: var(--amber-300); }
+
+/* ── SCORE TILES ─────────────────────────────────────────────── */
+.score-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; }
+.score-tile {
+  background: var(--bg-raised); border: 1px solid var(--border-dim);
+  border-radius: var(--r-md); padding: 10px 12px; display: flex; flex-direction: column; gap: 3px;
+}
+.score-tile-name { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-400); }
+.score-tile-val  { font-family: var(--font-mono); font-size: 20px; color: var(--text-100); }
+.score-tile-bar  { height: 2px; background: var(--bg-hover); border-radius: 1px; overflow: hidden; margin-top: 3px; }
+.score-tile-fill { height: 100%; border-radius: 1px; transition: width 0.3s ease; }
+
+/* ── STATUS ──────────────────────────────────────────────────── */
+.status-list { display: flex; flex-direction: column; }
+.status-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 7px 0; border-bottom: 1px solid var(--border-dim);
+}
+.status-row:last-child { border-bottom: none; }
+.status-key { font-size: 12px; color: var(--text-300); }
+.status-val { font-family: var(--font-mono); font-size: 12px; color: var(--text-200); }
+.badge {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  padding: 2px 7px; border-radius: 4px; letter-spacing: 0.05em;
+}
+.badge-ok   { background: var(--green-dim);  color: var(--green-400); border: 1px solid rgba(52,211,153,0.2); }
+.badge-warn { background: var(--amber-dim);  color: var(--amber-400); border: 1px solid rgba(245,166,35,0.2); }
+.badge-err  { background: var(--red-dim);    color: var(--red-400);   border: 1px solid rgba(245,86,74,0.2); }
+.badge-off  { background: var(--bg-raised);  color: var(--text-400);  border: 1px solid var(--border-dim); }
+
+/* ── HOURLY CHART ────────────────────────────────────────────── */
+.chart-wrap { position: relative; width: 100%; height: 150px; }
+
+/* ── TWO-COL ROW ─────────────────────────────────────────────── */
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 700px) { .row-2 { grid-template-columns: 1fr; } }
+
+/* ── TERMINAL ────────────────────────────────────────────────── */
+.terminal {
+  font-family: var(--font-mono); font-size: 11px; color: var(--teal-300);
+  background: #030508; border: 1px solid var(--border-dim);
+  border-radius: var(--r-md); padding: 10px 12px;
+  height: 140px; overflow-y: auto; white-space: pre-wrap;
+  word-break: break-all; line-height: 1.7;
+  scrollbar-width: thin; scrollbar-color: var(--border-mid) transparent;
+}
+.term-controls { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+
+/* ── BUTTONS ─────────────────────────────────────────────────── */
+.btn {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-200);
+  background: var(--bg-raised); border: 1px solid var(--border-mid);
+  border-radius: var(--r-sm); padding: 6px 12px; cursor: pointer;
+  transition: all 0.15s; letter-spacing: 0.03em; white-space: nowrap;
+}
+.btn:hover  { background: var(--bg-hover); border-color: var(--border-bright); color: var(--text-100); }
+.btn:active { transform: scale(0.97); }
+.btn.danger { color: var(--red-400); border-color: rgba(245,86,74,0.25); }
+.btn.danger:hover { background: var(--red-dim); }
+
+/* ── SLIDERS ─────────────────────────────────────────────────── */
+.slider-wrap { display: flex; flex-direction: column; gap: 12px; }
+.slider-row  { display: flex; flex-direction: column; gap: 4px; }
+.slider-hdr  { display: flex; justify-content: space-between; align-items: center; }
+.slider-name { font-size: 12px; color: var(--text-200); }
+.slider-val  { font-family: var(--font-mono); font-size: 12px; color: var(--amber-300); min-width: 64px; text-align: right; }
+input[type=range] {
+  -webkit-appearance: none; width: 100%; height: 4px;
+  background: var(--bg-raised); border-radius: 2px; outline: none; cursor: pointer;
+  border: 1px solid var(--border-dim);
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%;
+  background: var(--amber-400); border: 2px solid var(--bg-surface); cursor: pointer;
+}
+.apply-btn {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+  background: var(--amber-500); color: #fff; border: none;
+  border-radius: var(--r-sm); padding: 8px 20px; cursor: pointer;
+  transition: background 0.15s; margin-top: 4px;
+}
+.apply-btn:hover { background: var(--amber-400); }
+
+/* ── SETTINGS GEAR ───────────────────────────────────────────── */
+.fab-btn {
+  position: fixed; bottom: 22px; right: 22px;
+  width: 46px; height: 46px; border-radius: 50%;
+  background: var(--bg-surface); border: 1px solid rgba(245,166,35,0.4);
+  color: var(--amber-400);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+  transition: all 0.2s; z-index: 900;
+}
+.fab-btn:hover {
+  transform: rotate(40deg) scale(1.1);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.6), 0 0 12px var(--amber-glow);
+  background: var(--bg-hover);
+}
+.fab-btn svg { width: 20px; height: 20px; }
+
+/* ── MODAL ───────────────────────────────────────────────────── */
+.modal-bg {
+  position: fixed; inset: 0;
+  background: rgba(3,5,8,0.88); backdrop-filter: blur(10px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; animation: fadeIn 0.2s ease-out;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal-box {
+  background: var(--bg-surface); border: 1px solid rgba(245,166,35,0.4);
+  border-radius: var(--r-xl); width: 90%; max-width: 420px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 40px rgba(245,166,35,0.08);
+  overflow: hidden; animation: slideUp 0.25s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes slideUp { from { transform: scale(0.93) translateY(10px); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.modal-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--border-dim);
+}
+.modal-title { font-size: 15px; font-weight: 600; color: var(--text-100); }
+.modal-close {
+  background: none; border: none; color: var(--text-300);
+  font-size: 22px; cursor: pointer; line-height: 1; transition: color 0.15s;
+}
+.modal-close:hover { color: var(--red-400); }
+.modal-bd { padding: 20px; }
+.modal-desc { font-size: 13px; color: var(--text-200); margin-bottom: 16px; line-height: 1.6; }
+.form-label { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-300); display: block; margin-bottom: 6px; }
+.form-input {
+  width: 100%; background: var(--bg-base); border: 1px solid var(--border-bright);
+  border-radius: var(--r-md); padding: 10px 14px; color: var(--text-100);
+  font-family: var(--font-mono); font-size: 13px; outline: none; transition: all 0.18s;
+}
+.form-input:focus { border-color: var(--amber-400); box-shadow: 0 0 0 3px var(--amber-dim); }
+.modal-ft {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 14px 20px; background: var(--bg-raised); border-top: 1px solid var(--border-dim);
+}
+.modal-btn {
+  font-family: var(--font-ui); font-size: 13px; font-weight: 500;
+  padding: 7px 18px; border-radius: var(--r-sm); border: none; cursor: pointer; transition: all 0.15s;
+}
+.modal-btn.prim  { background: var(--amber-500); color: #fff; }
+.modal-btn.prim:hover { background: var(--amber-400); }
+.modal-btn.sec   { background: transparent; color: var(--text-200); border: 1px solid var(--border-mid); }
+.modal-btn.sec:hover { background: var(--bg-hover); color: var(--text-100); }
+
+/* ── SCROLLBAR ───────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="header">
+  <div class="header-brand">
+    <div class="brand-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#F5A623" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="2.5"/>
+        <path d="M6.5 12a5.5 5.5 0 1 1 11 0"/>
+        <path d="M3 12a9 9 0 1 1 18 0"/>
+        <line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-name">LD2420 Presence Intelligence</div>
+      <div class="brand-sub">HLK-LD2420 · 24 GHz FMCW · ESP8266 · 115200 Bd</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="uptime-badge" id="uptime-badge">UPTIME 00:00:00</div>
+    <div class="unit-toggle">
+      <button class="unit-btn active" id="btn-cm" onclick="setUnit('cm')">cm</button>
+      <button class="unit-btn"        id="btn-m"  onclick="setUnit('m')">m</button>
+    </div>
+    <div class="conn-pill">
+      <div class="conn-dot" id="conn-dot"></div>
+      <span class="conn-label" id="conn-label">OFFLINE</span>
+    </div>
+  </div>
+</header>
+
+<!-- ===== MAIN GRID ===== -->
+<div class="grid">
+
+  <!-- ─── 3D RADAR MAP (full width) ─── -->
+  <div class="panel full-row" id="panel-3d">
+    <div class="panel-head">
+      <span class="panel-title">3D Spatial Map — Live Presence Volume</span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div class="hud-view-btns" style="position:relative;pointer-events:all;">
+          <button class="view-btn active" id="vb-3d"    onclick="setView('3d')">3D</button>
+          <button class="view-btn"        id="vb-top"   onclick="setView('top')">TOP</button>
+          <button class="view-btn"        id="vb-side"  onclick="setView('side')">SIDE</button>
+          <button class="view-btn"        id="vb-front" onclick="setView('front')">FRONT</button>
+        </div>
+        <span class="badge badge-off" id="hw-badge">HW IDLE</span>
+      </div>
+    </div>
+    <div class="radar3d-wrap">
+      <canvas id="radar3d-canvas"></canvas>
+      <div class="radar3d-hud">
+        <div class="hud-left">
+          <div class="hud-pill">DIST <span id="hud-dist">—</span></div>
+          <div class="hud-pill">ZONE <span id="hud-zone">—</span></div>
+          <div class="hud-pill">CONF <span id="hud-conf">0%</span></div>
+          <div class="hud-pill">ACT  <span id="hud-act">None</span></div>
+        </div>
+        <div class="hud-right">
+          <div class="hud-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:#F5A623"></div>Moving</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#1DB8A8"></div>Static</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#34D399"></div>Target</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#60A5FA"></div>Zone Heat</div>
+          </div>
+          <div class="hud-pill" style="text-align:right;font-size:9px;color:var(--text-400)">🖱 Drag·Scroll·Touch</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── LEFT COLUMN ─── -->
+  <div class="col-left">
+
+    <!-- Radar Scope -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">Radar Scope</span>
+        <span class="badge badge-off" id="scope-hw">HW IDLE</span>
+      </div>
+      <div class="radar-scope">
+        <div class="scope-wrap">
+          <canvas id="scope-canvas" width="210" height="210"></canvas>
+          <div class="scope-center">
+            <div class="scope-dist-val" id="scope-dist">—</div>
+            <div class="scope-dist-unit" id="scope-unit">cm</div>
+          </div>
+        </div>
+        <div class="scope-state" id="scope-state">INITIALIZING</div>
+      </div>
+    </div>
+
+    <!-- Detection Confidence -->
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">Detection Confidence</span></div>
+      <div class="panel-body">
+        <div class="gauge-list">
+          <div class="gauge-item">
+            <div class="gauge-hdr"><span class="gauge-name">Presence</span><span class="gauge-val" id="gv-pres">0%</span></div>
+            <div class="gauge-track"><div class="gauge-fill" id="gf-pres" style="width:0%;background:var(--amber-400)"></div></div>
+          </div>
+          <div class="gauge-item">
+            <div class="gauge-hdr"><span class="gauge-name">Human</span><span class="gauge-val" id="gv-hum">0%</span></div>
+            <div class="gauge-track"><div class="gauge-fill" id="gf-hum" style="width:0%;background:var(--teal-400)"></div></div>
+          </div>
+          <div class="gauge-item">
+            <div class="gauge-hdr"><span class="gauge-name">Occupancy</span><span class="gauge-val" id="gv-occ">0%</span></div>
+            <div class="gauge-track"><div class="gauge-fill" id="gf-occ" style="width:0%;background:var(--blue-400)"></div></div>
+          </div>
+          <div class="gauge-item">
+            <div class="gauge-hdr"><span class="gauge-name">Signal Quality</span><span class="gauge-val" id="gv-sig">0%</span></div>
+            <div class="gauge-track"><div class="gauge-fill" id="gf-sig" style="width:0%;background:var(--green-400)"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity Scores -->
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">Activity Scores</span></div>
+      <div class="panel-body">
+        <div class="score-grid">
+          <div class="score-tile">
+            <div class="score-tile-name">Motion</div>
+            <div class="score-tile-val" id="sc-motion">0</div>
+            <div class="score-tile-bar"><div class="score-tile-fill" id="sf-motion" style="width:0%;background:var(--amber-400)"></div></div>
+          </div>
+          <div class="score-tile">
+            <div class="score-tile-name">Activity</div>
+            <div class="score-tile-val" id="sc-activity">0</div>
+            <div class="score-tile-bar"><div class="score-tile-fill" id="sf-activity" style="width:0%;background:var(--teal-400)"></div></div>
+          </div>
+          <div class="score-tile">
+            <div class="score-tile-name">Restlessness</div>
+            <div class="score-tile-val" id="sc-restless">0</div>
+            <div class="score-tile-bar"><div class="score-tile-fill" id="sf-restless" style="width:0%;background:var(--red-400)"></div></div>
+          </div>
+          <div class="score-tile">
+            <div class="score-tile-name">Stability</div>
+            <div class="score-tile-val" id="sc-stable">0</div>
+            <div class="score-tile-bar"><div class="score-tile-fill" id="sf-stable" style="width:0%;background:var(--blue-400)"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /col-left -->
+
+  <!-- ─── RIGHT COLUMN ─── -->
+  <div class="col-right">
+
+    <!-- Presence Hero + Metrics -->
+    <div class="panel">
+      <div class="pres-hero">
+        <div class="pres-orb empty" id="pres-orb">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          </svg>
+        </div>
+        <div class="pres-info">
+          <div class="pres-state-name" id="pres-state">EMPTY</div>
+          <div class="pres-activity"   id="pres-activity">No activity</div>
+          <div class="pres-msg"        id="pres-msg" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-200); margin-bottom: 6px;">Awaiting data...</div>
+          <div class="pres-chips">
+            <div class="chip">PRES <span id="chip-pres">0%</span></div>
+            <div class="chip">HUM  <span id="chip-hum">0%</span></div>
+            <div class="chip">OCC  <span id="chip-occ">0%</span></div>
+            <div class="chip">SNR  <span id="chip-snr">— dB</span></div>
+          </div>
+        </div>
+        <div class="pres-session">
+          <div class="session-label">Session</div>
+          <div class="session-dur"   id="sess-dur">00:00</div>
+          <div class="session-count" id="sess-cnt">0 sessions</div>
+        </div>
+      </div>
+      <div class="metrics-row">
+        <div class="metric-card" id="mc-movdist" style="--mc-color:var(--amber-400)">
+          <div class="metric-lbl">Moving Range</div>
+          <div><span class="metric-val" id="mv-movdist">—</span><span class="metric-unit" id="mu-movdist">cm</span></div>
+          <div class="metric-sub" id="ms-movdist">smooth: —</div>
+        </div>
+        <div class="metric-card" id="mc-movener" style="--mc-color:var(--amber-500)">
+          <div class="metric-lbl">True Velocity</div>
+          <div><span class="metric-val" id="mv-movener">0</span><span class="metric-unit">cm/s</span></div>
+          <div class="metric-sub" id="ms-movener" style="color:var(--amber-300); font-weight:bold;">kalman filter</div>
+        </div>
+        <div class="metric-card" id="mc-statdist" style="--mc-color:var(--teal-400)">
+          <div class="metric-lbl">Static Range</div>
+          <div><span class="metric-val" id="mv-statdist">—</span><span class="metric-unit" id="mu-statdist">cm</span></div>
+          <div class="metric-sub" id="ms-statdist">zone: —</div>
+        </div>
+        <div class="metric-card" id="mc-statener" style="--mc-color:var(--teal-500)">
+          <div class="metric-lbl">Static Energy</div>
+          <div><span class="metric-val" id="mv-statener">0</span><span class="metric-unit">%</span></div>
+          <div class="metric-sub">presence strength</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zone Map + Hourly -->
+    <div class="row-2">
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Zone Map (8 × 1 m)</span>
+          <div style="display:flex;gap:6px;">
+            <div class="legend-item"><div class="legend-dot" style="background:var(--amber-400)"></div>Motion</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--teal-400)"></div>Static</div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="zone-list" id="zone-list"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Hourly Occupancy</span></div>
+        <div class="panel-body">
+          <div class="chart-wrap"><canvas id="hourly-chart"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status + Controls -->
+    <div class="row-2">
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">System Status</span></div>
+        <div class="panel-body" style="padding:8px 16px;">
+          <div class="status-list">
+            <div class="status-row"><span class="status-key">Hardware (OT2)</span><span id="st-hw"  class="badge badge-off">IDLE</span></div>
+            <div class="status-row"><span class="status-key">Serial Protocol</span><span id="st-sw"  class="badge badge-off">IDLE</span></div>
+            <div class="status-row"><span class="status-key">RX Buffer</span>      <span id="st-buf" class="badge badge-ok">CLEAN</span></div>
+            <div class="status-row"><span class="status-key">Valid Packets</span>  <span class="status-val" id="st-pkts">0</span></div>
+            <div class="status-row"><span class="status-key">Frame Errors</span>   <span class="status-val" id="st-errs" style="color:var(--red-400)">0</span></div>
+            <div class="status-row"><span class="status-key">Free Heap</span>      <span class="status-val" id="st-heap">—</span></div>
+            <div class="status-row"><span class="status-key">WiFi RSSI</span>      <span class="status-val" id="st-rssi">—</span></div>
+            <div class="status-row"><span class="status-key">Last Seen</span>      <span class="status-val" id="st-last">—</span></div>
+            <div class="status-row"><span class="status-key">Total Occupancy</span><span class="status-val" id="st-tocc">—</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Sensitivity Controls</span></div>
+        <div class="panel-body">
+          <div class="slider-wrap">
+            <div class="slider-row">
+              <div class="slider-hdr"><span class="slider-name">Motion Range</span><span class="slider-val" id="ro-motion">600 cm</span></div>
+              <input type="range" id="sl-motion" min="50" max="800" step="10" value="600" oninput="document.getElementById('ro-motion').textContent=this.value+' cm'">
+            </div>
+            <div class="slider-row">
+              <div class="slider-hdr"><span class="slider-name">Static Range</span><span class="slider-val" id="ro-static">400 cm</span></div>
+              <input type="range" id="sl-static" min="50" max="600" step="10" value="400" oninput="document.getElementById('ro-static').textContent=this.value+' cm'">
+            </div>
+            <div class="slider-row">
+              <div class="slider-hdr"><span class="slider-name">Sensitivity</span><span class="slider-val" id="ro-sens">5 / 10</span></div>
+              <input type="range" id="sl-sens" min="1" max="10" step="1" value="5" oninput="document.getElementById('ro-sens').textContent=this.value+' / 10'">
+            </div>
+            <button class="apply-btn" onclick="applyThresholds()">Apply Settings</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AKF & HMM Telemetry -->
+    <div class="row-2">
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">HMM Probabilities</span></div>
+        <div class="panel-body" style="padding:8px 16px;">
+          <div class="status-list">
+            <div class="status-row"><span class="status-key" style="color:var(--amber-300)">HMM: IDLE</span>   <span class="status-val" id="hmm-0">0%</span></div>
+            <div class="status-row"><span class="status-key" style="color:var(--amber-300)">HMM: SLEEPING</span><span class="status-val" id="hmm-1">0%</span></div>
+            <div class="status-row"><span class="status-key" style="color:var(--amber-300)">HMM: SITTING</span> <span class="status-val" id="hmm-2">0%</span></div>
+            <div class="status-row"><span class="status-key" style="color:var(--amber-300)">HMM: STANDING</span><span class="status-val" id="hmm-3">0%</span></div>
+            <div class="status-row"><span class="status-key" style="color:var(--amber-300)">HMM: WALKING</span> <span class="status-val" id="hmm-4">0%</span></div>
+            <div class="status-row"><span class="status-key" style="color:var(--amber-300)">HMM: RUNNING</span> <span class="status-val" id="hmm-5">0%</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Adaptive Kalman</span></div>
+        <div class="panel-body" style="padding:8px 16px;">
+          <div class="status-list">
+            <div class="status-row"><span class="status-key">Innovation Error</span><span class="status-val" id="st-innov" style="color:var(--teal-300)">0.00</span></div>
+            <div class="status-row"><span class="status-key">AKF Q-Multiplier</span><span class="status-val" id="st-qmult" style="color:var(--teal-300)">1.0x</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Serial Terminal -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">Serial Terminal</span>
+        <span class="badge badge-off" id="term-status">OFFLINE</span>
+      </div>
+      <div class="panel-body">
+        <div id="terminal" class="terminal">Awaiting connection...</div>
+        <div class="term-controls">
+          <button class="btn" onclick="sendCmd('enable')">ENABLE CONFIG</button>
+          <button class="btn" onclick="sendCmd('disable')">DISABLE CONFIG</button>
+          <button class="btn" onclick="sendCmd('version')">READ VERSION</button>
+          <button class="btn danger" onclick="sendCmd('reboot')">REBOOT</button>
+          <button class="btn danger" onclick="sendCmd('clear_sessions')">CLEAR HISTORY</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /col-right -->
+</div><!-- /grid -->
+
+<!-- Settings FAB -->
+<button class="fab-btn" onclick="showModal()" title="Configure ESP8266 IP">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 4.6a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 .33 1.65 1.65 0 0 0 10.51-1.51V-2a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+  </svg>
+</button>
+
+<!-- Connection Modal -->
+<div class="modal-bg" id="ip-modal" style="display:none">
+  <div class="modal-box">
+    <div class="modal-hd">
+      <h3 class="modal-title">⚙ Connection Setup</h3>
+      <button class="modal-close" onclick="hideModal()">&times;</button>
+    </div>
+    <div class="modal-bd">
+      <p class="modal-desc" style="font-weight:bold; margin-bottom: 4px;">Option 1: USB Direct (Raspberry Pi Pico)</p>
+      <p class="modal-desc" style="margin-bottom: 12px;">Connect directly via USB Cable at 115200 baud. Requires Chrome/Edge browser.</p>
+      <button class="modal-btn prim" style="width:100%; margin-bottom:20px;" onclick="connectWebSerial()">🔗 Connect USB Serial</button>
+
+      <hr style="border:0; border-top:1px solid var(--surface-100); margin-bottom:20px;">
+
+      <p class="modal-desc" style="font-weight:bold; margin-bottom: 4px;">Option 2: WiFi Network (ESP8266 / ESP32)</p>
+      <p class="modal-desc">Enter the mDNS address (ld2420.local) or IP address of your wireless board.</p>
+      <label class="form-label" for="ip-input">ESP8266 IP Address</label>
+      <input type="text" id="ip-input" class="form-input" placeholder="ld2420.local or IP" autocomplete="off"
+             onkeydown="if(event.key==='Enter') saveIp()">
+    </div>
+    <div class="modal-ft">
+      <button class="modal-btn sec" onclick="hideModal()">Cancel</button>
+      <button class="modal-btn prim" onclick="saveIp()">Connect</button>
+    </div>
+  </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<!-- Three.js r128 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+'use strict';
+
+// ============================================================
+// CONFIG
+// ============================================================
+let espHost  = localStorage.getItem('ld2420_esp_ip') || '';
+let unitMode = 'cm';
+let wsConn   = null;
+let lastData = null;
+let sweepAngle = 0;
+let radarAnimId = null;
+let hourlyChart = null;
+
+// ============================================================
+// UNIT TOGGLE
+// ============================================================
+function setUnit(u) {
+  unitMode = u;
+  document.getElementById('btn-cm').classList.toggle('active', u === 'cm');
+  document.getElementById('btn-m').classList.toggle('active',  u === 'm');
+  if (lastData) render(lastData);
+}
+function fmtDist(cm) {
+  if (!cm || cm === 0) return '—';
+  return unitMode === 'm' ? (cm / 100).toFixed(2) : String(Math.round(cm));
+}
+function distUnit() { return unitMode === 'm' ? 'm' : 'cm'; }
+
+// ============================================================
+// MODAL
+// ============================================================
+function showModal() {
+  document.getElementById('ip-input').value = espHost;
+  document.getElementById('ip-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('ip-input').focus(), 100);
+}
+function hideModal() {
+  document.getElementById('ip-modal').style.display = 'none';
+}
+function saveIp() {
+  const v = document.getElementById('ip-input').value.trim();
+  if (!v) return;
+  espHost = v;
+  localStorage.setItem('ld2420_esp_ip', v);
+  hideModal();
+  connectWS();
+}
+
+// ============================================================
+// WEB SERIAL (USB PICO)
+// ============================================================
+let serialPort = null;
+let serialReader = null;
+let serialActive = false;
+
+async function connectWebSerial() {
+  hideModal();
+  try {
+    serialPort = await navigator.serial.requestPort();
+    await serialPort.open({ baudRate: 115200 });
+    
+    setConnState('live', 'USB CONNECTED');
+    if (wsConn) { wsConn.close(); wsConn = null; }
+    serialActive = true;
+    termLog('[SYS] Web Serial API Connected at 115200 baud');
+    
+    // Read Loop
+    const textDecoder = new TextDecoderStream();
+    const readableStreamClosed = serialPort.readable.pipeTo(textDecoder.writable);
+    serialReader = textDecoder.readable.getReader();
+    
+    let buffer = '';
+    while (true) {
+      const { value, done } = await serialReader.read();
+      if (done) break;
+      buffer += value;
+      let lines = buffer.split('\n');
+      buffer = lines.pop(); // keep remainder
+      
+      for (let line of lines) {
+        line = line.trim();
+        if (line.startsWith('{') && line.endsWith('}')) {
+          try {
+            const data = JSON.parse(line);
+            lastData = data;
+            render(data);
+          } catch(e) {}
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Serial Connection Error:", err);
+    setConnState('err', 'USB FAILED');
+    termLog('[ERR] USB Serial Error: ' + err.message);
+    serialActive = false;
+  }
+}
+
+// ============================================================
+// WEBSOCKET (ESP8266)
+// ============================================================
+function setConnState(state, label) {
+  if (serialActive && state !== 'live') return; // Do not override if USB is active
+  document.getElementById('conn-dot').className   = 'conn-dot ' + state;
+  document.getElementById('conn-label').textContent = label;
+}
+
+function connectWS() {
+  if (serialActive) return; // Disallow WS if USB is actively connected
+
+  // Resolve host
+  const h = location.hostname;
+  if (h && h !== 'localhost' && h !== '127.0.0.1') espHost = h;
+  if (!espHost) { showModal(); return; }
+
+  // Close existing
+  if (wsConn) { try { wsConn.onclose = null; wsConn.close(); } catch(e){} wsConn = null; }
+
+  setConnState('warn', 'CONNECTING');
+  termLog('[SYS] Connecting to ws://' + espHost + ':81 ...');
+
+  let ws;
+  try {
+    ws = new WebSocket('ws://' + espHost + ':81/');
+  } catch(e) {
+    setConnState('err', 'ERROR');
+    termLog('[ERR] WebSocket creation failed: ' + e.message);
+    setTimeout(connectWS, 6000);
+    return;
+  }
+
+  ws.onopen = () => {
+    setConnState('live', 'LIVE');
+    document.getElementById('term-status').className = 'badge badge-ok';
+    document.getElementById('term-status').textContent = 'STREAMING';
+    termLog('[SYS] Connected to ' + espHost + ':81');
+  };
+  ws.onclose = (e) => {
+    setConnState('warn', 'RECONNECTING');
+    document.getElementById('term-status').className = 'badge badge-warn';
+    document.getElementById('term-status').textContent = 'OFFLINE';
+    termLog('[SYS] Disconnected (code ' + e.code + '). Retrying in 4s...');
+    setTimeout(connectWS, 4000);
+  };
+  ws.onerror = () => {
+    setConnState('err', 'ERROR');
+    termLog('[ERR] WebSocket error — check IP ' + espHost);
+  };
+  ws.onmessage = (ev) => {
+    try {
+      const d = JSON.parse(ev.data);
+      lastData = d;
+      render(d);
+    } catch(_) {}
+  };
+  wsConn = ws;
+}
+
+// ============================================================
+// TERMINAL
+// ============================================================
+const termEl = () => document.getElementById('terminal');
+function termLog(msg) {
+  const el = termEl();
+  const ts  = new Date().toTimeString().slice(0,8);
+  el.textContent += '[' + ts + '] ' + msg + '\n';
+  el.scrollTop = el.scrollHeight;
+}
+
+// ============================================================
+// API HELPERS
+// ============================================================
+function apiBase() {
+  if (location.protocol === 'http:') return '';
+  return 'http://' + espHost;
+}
+function apiFetch(path) {
+  return fetch(apiBase() + path);
+}
+function sendCmd(action) {
+  if (!espHost) { termLog('[WARN] No ESP host configured.'); return; }
+  apiFetch('/api/cmd?action=' + action)
+    .then(r => r.ok ? r.text() : Promise.reject(r.status))
+    .then(() => termLog('[CMD] Sent: ' + action.toUpperCase()))
+    .catch(e  => termLog('[ERR] Command failed: ' + e));
+}
+function applyThresholds() {
+  if (!espHost) { termLog('[WARN] No ESP host configured.'); return; }
+  const m = document.getElementById('sl-motion').value;
+  const s = document.getElementById('sl-static').value;
+  const v = document.getElementById('sl-sens').value;
+  apiFetch('/api/thresholds?motion_cm=' + m + '&static_cm=' + s + '&sensitivity=' + v)
+    .then(r => r.ok ? r.text() : Promise.reject(r.status))
+    .then(() => termLog('[CFG] Thresholds → motion=' + m + 'cm static=' + s + 'cm sens=' + v))
+    .catch(e  => termLog('[ERR] Threshold update failed: ' + e));
+}
+
+// Terminal hex poll
+function startTermPoll() {
+  setInterval(() => {
+    if (!espHost) return;
+    apiFetch('/api/hex').then(r => r.text()).then(t => {
+      if (!t.trim()) return;
+      const el = termEl();
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+      el.textContent = t;
+      if (atBottom) el.scrollTop = el.scrollHeight;
+    }).catch(() => {});
+  }, 700);
+}
+
+// ============================================================
+// MAIN RENDER
+// ============================================================
+function render(d) {
+  const present = !!(d.presence || d.hardware_presence || d.serial_presence);
+  const dc  = d.distance_cm        || 0;
+  const dcs = d.distance_cm_smooth || 0;
+  const zone = dc > 0 ? Math.min(7, Math.floor(dc / 100)) : -1;
+
+  // Presence orb
+  const orb = document.getElementById('pres-orb');
+  orb.className = 'pres-orb ' + (present ? 'active' : 'empty');
+
+  set('pres-state',    d.state    || 'EMPTY');
+  set('pres-activity', d.activity || 'None');
+  set('pres-msg',      d.detected_msg || 'No target detected.');
+
+  set('chip-pres', (d.presence_confidence  || 0) + '%');
+  set('chip-hum',  (d.human_confidence     || 0) + '%');
+  set('chip-occ',  (d.occupancy_confidence || 0) + '%');
+  set('chip-snr',  (d.noise_floor != null  ? d.noise_floor : '—') + ' dB');
+
+  // Gauges
+  setGauge('pres', d.presence_confidence  || 0);
+  setGauge('hum',  d.human_confidence     || 0);
+  setGauge('occ',  d.occupancy_confidence || 0);
+  setGauge('sig',  d.signal_quality       || 0);
+
+  // Metrics
+  const mdc = d.moving_dist_cm || 0;
+  const sdc = d.static_dist_cm || 0;
+  const szone = sdc > 0 ? Math.min(7, Math.floor(sdc / 100)) : -1;
+
+  set('mv-movdist', fmtDist(mdc));
+  set('mu-movdist', distUnit());
+  set('mv-statdist', fmtDist(sdc));
+  set('mu-statdist', distUnit());
+  set('ms-statdist', 'zone: ' + (szone >= 0 ? 'Z' + (szone+1) : '—'));
+  
+  // Velocity Update
+  const v = d.velocity_cm_s !== undefined ? d.velocity_cm_s : 0;
+  set('mv-movener', v);
+  set('mv-statener', d.energy_static || 0);
+  
+  setMcPct('mc-movdist',  mdc > 0 ? Math.min(100, mdc / 8) : 0);
+  setMcPct('mc-statdist', sdc > 0 ? Math.min(100, sdc / 8) : 0);
+  setMcPct('mc-movener',  Math.min(100, Math.abs(v)));
+  setMcPct('mc-statener', d.energy_static || 0);
+
+  // Left-To-Right Indicator
+  if (d.tangential_motion) {
+    set('ms-movener', 'Left-to-Right \u2194');
+  } else if (v < -15) {
+    set('ms-movener', 'Approaching \u2193');
+  } else if (v > 15) {
+    set('ms-movener', 'Leaving \u2191');
+  } else {
+    set('ms-movener', 'Radial Idle');
+  }
+
+  // Scope
+  set('scope-dist', fmtDist(dc));
+  set('scope-unit', distUnit());
+  set('scope-state', d.state || 'EMPTY');
+
+  // HW badge
+  setBadge('hw-badge',    d.hardware_presence, 'HW ACTIVE', 'HW IDLE',   'badge-warn', 'badge-off');
+  setBadge('scope-hw',   d.hardware_presence, 'HW ACTIVE', 'HW IDLE',   'badge-warn', 'badge-off');
+  setBadge('st-hw',      d.hardware_presence, 'ACTIVE',    'IDLE',      'badge-warn', 'badge-off');
+  setBadge('st-sw',      d.serial_presence,   'LIVE',      'IDLE',      'badge-ok',   'badge-off');
+  setBadge('st-buf',     !d.overflow,         'CLEAN',     'OVERFLOW',  'badge-ok',   'badge-err');
+
+  set('st-pkts', (d.packets || 0).toLocaleString());
+  set('st-errs', (d.errors  || 0).toLocaleString());
+  set('st-heap', d.heap_free != null ? Math.round(d.heap_free / 1024) + ' kB' : '—');
+  set('st-rssi', d.wifi_rssi != null ? d.wifi_rssi + ' dBm' : '—');
+
+  const ago = d.ms_since_seen || 0;
+  set('st-last', ago < 2000 ? 'LIVE' : Math.round(ago / 1000) + 's ago');
+  set('st-tocc',   fmtDuration(d.total_occupancy_s || 0));
+
+  // Session
+  set('sess-dur', fmtMinSec(d.current_session_s || 0));
+  set('sess-cnt', (d.session_count || 0) + ' sessions');
+
+  // Scores
+  setScore('motion',   d.motion_score   || 0, 'var(--amber-400)');
+  setScore('activity', d.activity_score || 0, 'var(--teal-400)');
+  setScore('restless', d.restlessness   || 0, 'var(--red-400)');
+  setScore('stable',   d.stability      || 0, 'var(--blue-400)');
+
+  // Uptime
+  set('uptime-badge', 'UPTIME ' + fmtHMS(d.uptime_s || 0));
+
+  // HUD
+  set('hud-dist', dc > 0 ? fmtDist(dc) + ' ' + distUnit() : '—');
+  set('hud-zone', zone >= 0 ? 'Z' + (zone+1) + ' (' + (zone*100) + '–' + ((zone+1)*100) + 'cm)' : '—');
+  set('hud-conf', (d.presence_confidence || 0) + '%');
+  set('hud-act',  d.activity || 'None');
+
+  // HMM & AKF Updates
+  if (d.kalman_innov !== undefined) {
+      set('st-innov', parseFloat(d.kalman_innov).toFixed(2));
+      let qm = 1.0 + (Math.abs(d.kalman_innov) / 10.0);
+      if (qm > 15.0) qm = 15.0;
+      set('st-qmult', qm.toFixed(2) + 'x');
+  }
+  if (d.markov) {
+      for (let i = 0; i < 6; i++) {
+          set('hmm-' + i, (d.markov[i] * 100).toFixed(1) + '%');
+      }
+  }
+
+  // Zone map
+  if (d.zones) renderZoneMap(d.zones, zone);
+
+  // Hourly chart
+  if (d.hourly) renderHourly(d.hourly);
+
+  // 3D scene
+  if (d.zones) update3D(d);
+}
+
+// ============================================================
+// ZONE MAP
+// ============================================================
+function renderZoneMap(zones, activeZone) {
+  const wrap = document.getElementById('zone-list');
+  // Build rows once
+  if (wrap.children.length === 0) {
+    for (let z = 0; z < 8; z++) {
+      const row = document.createElement('div');
+      row.className = 'zone-row';
+      row.id = 'zr-' + z;
+      row.innerHTML =
+        `<div class="zone-lbl" id="zl-${z}">Z${z+1} ${z*100}–${(z+1)*100}</div>
+         <div class="zone-track"><div class="zone-fill" id="zf-${z}" style="width:0%"></div></div>
+         <div class="zone-pct" id="zp-${z}">0%</div>`;
+      wrap.appendChild(row);
+    }
+  }
+  zones.forEach((z, i) => {
+    const row  = document.getElementById('zr-' + i);
+    const fill = document.getElementById('zf-' + i);
+    const pct  = document.getElementById('zp-' + i);
+    if (!row) return;
+    const pctVal = Math.max(z.motion || 0, z.static_e || 0);
+    const color  = (z.motion || 0) >= (z.static_e || 0) ? 'var(--amber-400)' : 'var(--teal-400)';
+    if (fill) { fill.style.width = pctVal + '%'; fill.style.background = color; }
+    if (pct)  pct.textContent = (z.prob || 0) + '%';
+    row.className = 'zone-row' + (i === activeZone ? ' active-zone' : '');
+  });
+}
+
+// ============================================================
+// HOURLY CHART
+// ============================================================
+function renderHourly(hourly) {
+  const labels = hourly.map((_, i) => i + 'h');
+  if (!hourlyChart) {
+    const ctx = document.getElementById('hourly-chart').getContext('2d');
+    hourlyChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Presence (s)', data: hourly,
+          backgroundColor: 'rgba(245,166,35,0.55)',
+          borderColor: '#F5A623', borderWidth: 1, borderRadius: 3,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        animation: { duration: 200 },
+        plugins: { legend: { display: false }, tooltip: { callbacks: {
+          label: ctx => ctx.raw + ' s'
+        }}},
+        scales: {
+          x: { ticks: { color: '#616878', font: { family: 'JetBrains Mono', size: 9 }, autoSkip: true, maxTicksLimit: 12 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+          y: { ticks: { color: '#616878', font: { family: 'JetBrains Mono', size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+        }
+      }
+    });
+  } else {
+    hourlyChart.data.datasets[0].data = hourly;
+    hourlyChart.update('none');
+  }
+}
+
+// ============================================================
+// 2D RADAR SCOPE (SMOOTH CIRCLES)
+// ============================================================
+let smoothR2D = 0;
+function initScope() {
+  const canvas = document.getElementById('scope-canvas');
+  const ctx = canvas.getContext('2d');
+  const cx = 105, cy = 105, maxR = 96;
+
+  function drawScope() {
+    ctx.clearRect(0, 0, 210, 210);
+
+    // BG
+    ctx.fillStyle = '#0A0D14';
+    ctx.beginPath(); ctx.arc(cx, cy, maxR + 4, 0, Math.PI*2); ctx.fill();
+
+    // Smooth circle lines (Zones)
+    for (let r = 1; r <= 8; r++) {
+      const rad = (maxR/8)*r;
+      ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI*2);
+      ctx.strokeStyle = r===8 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)';
+      ctx.lineWidth = 1; ctx.stroke();
+    }
+
+    // Zone occupancy heat
+    if (lastData && lastData.zones) {
+      lastData.zones.forEach((z, i) => {
+        const r1 = (maxR/8)*i, r2 = (maxR/8)*(i+1);
+        const alpha = (z.prob || 0) / 100 * 0.3;
+        if (alpha > 0.01) {
+          ctx.beginPath();
+          ctx.arc(cx,cy,r2,0,Math.PI*2); ctx.arc(cx,cy,r1,0,Math.PI*2,true);
+          ctx.fillStyle = 'rgba(245,166,35,' + alpha + ')'; ctx.fill();
+        }
+      });
+    }
+
+    // Smooth Interpolated Target Dot
+    let targetR = 0;
+    if (lastData && (lastData.presence || lastData.serial_presence) && (lastData.distance_cm||0) > 0) {
+      targetR = Math.min(maxR, (lastData.distance_cm/800)*maxR);
+    }
+    
+    // Lerp radius
+    smoothR2D += (targetR - smoothR2D) * 0.15;
+
+    if (smoothR2D > 1) {
+      // Map straight forward (upwards visually)
+      const tx = cx, ty = cy - smoothR2D;
+      
+      // Smooth Halo
+      ctx.beginPath(); ctx.arc(tx,ty,12,0,Math.PI*2);
+      ctx.fillStyle = 'rgba(52,211,153,0.25)'; ctx.fill();
+      // Core
+      ctx.beginPath(); ctx.arc(tx,ty,5,0,Math.PI*2);
+      ctx.fillStyle = '#34D399'; ctx.fill();
+    }
+
+    // Center dot (Sensor)
+    ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2);
+    ctx.fillStyle = '#F5A623'; ctx.fill();
+
+    // Outer ring
+    ctx.beginPath(); ctx.arc(cx,cy,maxR,0,Math.PI*2);
+    ctx.strokeStyle = 'rgba(245,166,35,0.3)'; ctx.lineWidth=1.5; ctx.stroke();
+
+    radarAnimId = requestAnimationFrame(drawScope);
+  }
+  drawScope();
+}
+
+// ============================================================
+// THREE.JS 3D RADAR MAP — full rebuild
+// ============================================================
+let scene3, cam3, ren3, targetMesh, targetGlow, staticTargetMesh;
+let zoneRings = [];
+let trailPts  = [], trailLine;
+let orbitTh   = Math.PI/4, orbitPh = Math.PI/3.5, orbitR = 14;
+let isDragging = false, lastMX = 0, lastMY = 0;
+let currentView3D = '3d';
+let particleSys, particlePos;
+const MAX_TRAIL = 60;
+
+function init3D() {
+  const container = document.querySelector('.radar3d-wrap');
+  const W = container.clientWidth  || 900;
+  const H = container.clientHeight || 460;
+
+  // Scene
+  scene3 = new THREE.Scene();
+  scene3.background = new THREE.Color(0x03050A);
+  scene3.fog = new THREE.FogExp2(0x03050A, 0.038);
+
+  // Camera
+  cam3 = new THREE.PerspectiveCamera(50, W/H, 0.1, 250);
+
+  // Renderer
+  const canvas = document.getElementById('radar3d-canvas');
+  ren3 = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  ren3.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  ren3.setSize(W, H);
+  ren3.shadowMap.enabled = true;
+
+  // Lights
+  scene3.add(new THREE.AmbientLight(0xffffff, 0.2));
+  const dir = new THREE.DirectionalLight(0xffd580, 0.9);
+  dir.position.set(5, 10, 5); dir.castShadow = true; scene3.add(dir);
+  const pt = new THREE.PointLight(0xF5A623, 2.0, 18);
+  pt.position.set(0, 3, 0); scene3.add(pt);
+
+  // Floor grid — XZ plane
+  const grid = new THREE.GridHelper(20, 40, 0x1a2238, 0x0d1120);
+  grid.position.y = -0.01; scene3.add(grid);
+
+  // Floor disc subtle glow
+  const fdGeo = new THREE.CircleGeometry(9, 64);
+  const fdMat = new THREE.MeshBasicMaterial({ color: 0x0a1020, transparent: true, opacity: 0.6, depthWrite: false });
+  const fd = new THREE.Mesh(fdGeo, fdMat);
+  fd.rotation.x = -Math.PI/2; fd.position.y = 0.005; scene3.add(fd);
+
+  // Sensor origin
+  const ogGeo = new THREE.SphereGeometry(0.14, 16, 16);
+  const ogMat = new THREE.MeshStandardMaterial({ color: 0xF5A623, emissive: 0xF5A623, emissiveIntensity: 1.0 });
+  const og = new THREE.Mesh(ogGeo, ogMat); og.position.set(0,0,0); scene3.add(og);
+  // Origin ring
+  const orRing = new THREE.RingGeometry(0.18, 0.22, 32);
+  const orMat  = new THREE.MeshBasicMaterial({ color: 0xF5A623, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
+  const orMesh = new THREE.Mesh(orRing, orMat); orMesh.rotation.x = -Math.PI/2; scene3.add(orMesh);
+  addLabel('SENSOR', new THREE.Vector3(0, 0.45, 0), 0xF5A623);
+
+  // Zone cylinder shells (8 zones, 1m each)
+  const zColors = [0xF5A623,0xF5A623,0xD4881A,0xA3650E,0x1DB8A8,0x0F8A7D,0x60A5FA,0x3B82F6];
+  for (let z = 0; z < 8; z++) {
+    const r = z + 1;
+    // Outer shell
+    const shellGeo = new THREE.CylinderGeometry(r, r, 2.5, 64, 1, true);
+    const shellMat = new THREE.MeshBasicMaterial({
+      color: zColors[z], transparent: true, opacity: 0.03,
+      side: THREE.BackSide, depthWrite: false
+    });
+    const shell = new THREE.Mesh(shellGeo, shellMat);
+    scene3.add(shell);
+
+    // Floor ring disc (thin)
+    const rGeo = new THREE.RingGeometry(z, r, 64);
+    const rMat = new THREE.MeshBasicMaterial({
+      color: zColors[z], transparent: true,
+      opacity: z === 0 ? 0.08 : 0.04, side: THREE.DoubleSide, depthWrite: false
+    });
+    const rMesh = new THREE.Mesh(rGeo, rMat);
+    rMesh.rotation.x = -Math.PI/2; rMesh.position.y = 0.002; scene3.add(rMesh);
+
+    // Zone label
+    const ang = (z % 2 === 0) ? 0.2 : -0.2;
+    addLabel('Z'+(z+1), new THREE.Vector3(Math.cos(ang)*(z+0.5), 0.12, Math.sin(ang)*(z+0.5)), zColors[z]);
+    zoneRings.push({ shellMat });
+  }
+
+  // Target sphere
+  const tGeo = new THREE.SphereGeometry(0.20, 24, 24);
+  const tMat = new THREE.MeshStandardMaterial({
+    color: 0x34D399, emissive: 0x34D399, emissiveIntensity: 1.2,
+    transparent: true, opacity: 0.9
+  });
+  targetMesh = new THREE.Mesh(tGeo, tMat);
+  targetMesh.visible = false; scene3.add(targetMesh);
+
+  // Static Obstacle target sphere (teal, smaller)
+  const stGeo = new THREE.SphereGeometry(0.15, 20, 20);
+  const stMat = new THREE.MeshStandardMaterial({
+    color: 0x1DB8A8, emissive: 0x1DB8A8, emissiveIntensity: 0.8,
+    transparent: true, opacity: 0.7
+  });
+  staticTargetMesh = new THREE.Mesh(stGeo, stMat);
+  staticTargetMesh.visible = false; scene3.add(staticTargetMesh);
+
+  // Smooth target glow sphere
+  const tgGeo = new THREE.SphereGeometry(0.35, 24, 24);
+  const tgMat = new THREE.MeshBasicMaterial({
+    color: 0x34D399, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  targetGlow = new THREE.Mesh(tgGeo, tgMat);
+  targetGlow.visible = false; scene3.add(targetGlow);
+
+  // Trail line
+  const trailGeo = new THREE.BufferGeometry();
+  const trailArr = new Float32Array(MAX_TRAIL * 3);
+  trailGeo.setAttribute('position', new THREE.BufferAttribute(trailArr, 3));
+  const trailMat = new THREE.LineBasicMaterial({ color: 0x34D399, transparent: true, opacity: 0.4 });
+  trailLine = new THREE.Line(trailGeo, trailMat);
+  trailLine.frustumCulled = false; scene3.add(trailLine);
+
+  // Particle field
+  const PARTS = 300;
+  const pGeo = new THREE.BufferGeometry();
+  particlePos = new Float32Array(PARTS * 3);
+  pGeo.setAttribute('position', new THREE.BufferAttribute(particlePos, 3));
+  const pMat = new THREE.PointsMaterial({ color: 0xF5A623, size: 0.05, transparent: true, opacity: 0.0, depthWrite: false });
+  particleSys = new THREE.Points(pGeo, pMat);
+  particleSys.frustumCulled = false; scene3.add(particleSys);
+
+  // Orbit controls
+  setupOrbit(canvas);
+  updateOrbitCam();
+
+  // Resize
+  window.addEventListener('resize', () => {
+    const W2 = container.clientWidth, H2 = container.clientHeight;
+    cam3.aspect = W2/H2; cam3.updateProjectionMatrix();
+    ren3.setSize(W2, H2);
+  });
+
+  animate3D();
+}
+
+function addLabel(text, pos, color) {
+  const cv = document.createElement('canvas');
+  cv.width = 128; cv.height = 32;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#' + color.toString(16).padStart(6,'0');
+  ctx.font = 'bold 14px JetBrains Mono, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, 64, 22);
+  const tex = new THREE.CanvasTexture(cv);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(1.1, 0.28, 1);
+  sprite.position.copy(pos);
+  scene3.add(sprite);
+}
+
+function setupOrbit(canvas) {
+  canvas.addEventListener('mousedown', e => { isDragging=true; lastMX=e.clientX; lastMY=e.clientY; });
+  window.addEventListener('mouseup',   () => { isDragging=false; });
+  window.addEventListener('mousemove', e => {
+    if (!isDragging || currentView3D !== '3d') return;
+    orbitTh -= (e.clientX - lastMX) * 0.006;
+    orbitPh  = Math.max(0.12, Math.min(1.45, orbitPh + (e.clientY - lastMY)*0.005));
+    lastMX=e.clientX; lastMY=e.clientY; updateOrbitCam();
+  });
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    orbitR = Math.max(4, Math.min(28, orbitR + e.deltaY * 0.02));
+    updateOrbitCam();
+  }, { passive:false });
+  // Touch
+  let lx=0,ly=0;
+  canvas.addEventListener('touchstart', e => { lx=e.touches[0].clientX; ly=e.touches[0].clientY; });
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (currentView3D !== '3d') return;
+    orbitTh -= (e.touches[0].clientX-lx)*0.006;
+    orbitPh  = Math.max(0.12, Math.min(1.45, orbitPh + (e.touches[0].clientY-ly)*0.005));
+    lx=e.touches[0].clientX; ly=e.touches[0].clientY; updateOrbitCam();
+  }, { passive:false });
+}
+
+function updateOrbitCam() {
+  const x = orbitR * Math.sin(orbitPh) * Math.sin(orbitTh);
+  const y = orbitR * Math.cos(orbitPh);
+  const z = orbitR * Math.sin(orbitPh) * Math.cos(orbitTh);
+  cam3.position.set(x, y, z);
+  cam3.lookAt(0, 0.6, 0);
+}
+
+function setView(v) {
+  currentView3D = v;
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('vb-' + v).classList.add('active');
+  const tgt = new THREE.Vector3(0, 0.6, 0);
+  if (v === 'top')   { cam3.position.set(0, 20, 0.001); cam3.lookAt(tgt); }
+  else if (v==='side')  { cam3.position.set(20, 1.5, 0);  cam3.lookAt(tgt); }
+  else if (v==='front') { cam3.position.set(0, 2.5, 20);  cam3.lookAt(tgt); }
+  else { orbitTh=Math.PI/4; orbitPh=Math.PI/3.5; orbitR=14; updateOrbitCam(); }
+}
+
+let targetZ = 0;
+let currentZ = 0;
+let targetStatZ = 0;
+let currentStatZ = 0;
+let targetIsVisible = false;
+let statIsVisible = false;
+let targetConf = 0;
+
+let isTangential = false;
+
+function update3D(d) {
+  if (!scene3) return;
+  const present = !!(d.presence || d.hardware_presence || d.serial_presence);
+  const dc = d.distance_cm || 0;
+  isTangential = d.tangential_motion || false;
+
+  // Zone heat
+  if (d.zones && zoneRings.length === 8) {
+    d.zones.forEach((z, i) => {
+      const prob   = (z.prob     || 0) / 100;
+      const motion = (z.motion   || 0) / 100;
+      const stat   = (z.static_e || 0) / 100;
+      const heat   = Math.max(prob * 0.55, motion * 0.45, stat * 0.3);
+      zoneRings[i].shellMat.opacity = Math.min(0.55, 0.02 + heat * 0.55);
+    });
+  }
+
+  // Update static target position
+  const sdc = d.static_dist_cm || 0;
+  if (sdc > 0) {
+    targetStatZ = sdc / 100;
+    statIsVisible = true;
+  } else {
+    statIsVisible = false;
+  }
+
+  // Update moving target position
+  if (present && dc > 0) {
+    targetZ = dc / 100;
+    targetIsVisible = true;
+    targetConf = (d.presence_confidence || 0) / 100;
+  } else {
+    targetIsVisible = false;
+  }
+}
+
+let clock3 = 0;
+function animate3D() {
+  requestAnimationFrame(animate3D);
+  clock3 += 0.016;
+
+  // Smoothly interpolate static target
+  if (statIsVisible) {
+    if (!staticTargetMesh.visible) currentStatZ = targetStatZ; // Jump if just appeared
+    currentStatZ += (targetStatZ - currentStatZ) * 0.08;
+    staticTargetMesh.position.set(0, 0.3, currentStatZ);
+    staticTargetMesh.visible = true;
+  } else if (staticTargetMesh) {
+    staticTargetMesh.visible = false;
+  }
+
+  // Smoothly interpolate moving target
+  if (targetIsVisible) {
+    if (!targetMesh.visible) currentZ = targetZ; // Jump if just appeared
+    currentZ += (targetZ - currentZ) * 0.15; // Smooth 60fps interpolation
+    
+    // Simulate lateral physics if tangential motion detected
+    const latX = isTangential ? Math.sin(clock3 * 3) * 1.5 : 0;
+    
+    targetMesh.position.set(latX, 1.0, currentZ);
+    targetMesh.visible = true;
+    
+    if (targetGlow) {
+      targetGlow.position.set(latX, 1.0, currentZ);
+      targetGlow.visible = true;
+      // Smooth breathing pulse
+      const s = 1 + 0.15 * Math.sin(clock3 * 4);
+      targetGlow.scale.set(s, s, s);
+    }
+
+    // Trail
+    trailPts.unshift(new THREE.Vector3(latX, 1.0, currentZ));
+    if (trailPts.length > MAX_TRAIL) trailPts.pop();
+    const trailArr = trailLine.geometry.attributes.position.array;
+    for (let i = 0; i < MAX_TRAIL; i++) {
+      const p = trailPts[i] || trailPts[trailPts.length-1] || {x:0,y:0,z:0};
+      trailArr[i*3]=p.x; trailArr[i*3+1]=p.y; trailArr[i*3+2]=p.z;
+    }
+    trailLine.geometry.setDrawRange(0, trailPts.length);
+    trailLine.geometry.attributes.position.needsUpdate = true;
+
+    // Particle cloud mapped to distance
+    for (let i = 0; i < 300; i++) {
+      particlePos[i*3]   = (Math.random()-0.5) * currentZ * 0.4;
+      particlePos[i*3+1] = 1.0 + (Math.random()-0.5) * 0.6;
+      particlePos[i*3+2] = currentZ + (Math.random()-0.5) * currentZ * 0.4;
+    }
+    particleSys.geometry.attributes.position.needsUpdate = true;
+    particleSys.material.opacity = Math.min(0.5, targetConf * 0.5);
+
+  } else {
+    targetMesh.visible = false;
+    if (targetGlow) targetGlow.visible = false;
+    trailPts = [];
+    particleSys.material.opacity = 0;
+  }
+
+  ren3.render(scene3, cam3);
+}
+
+// ============================================================
+// FORMAT HELPERS
+// ============================================================
+function fmtMinSec(s) {
+  return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(Math.floor(s%60)).padStart(2,'0');
+}
+function fmtHMS(s) {
+  return String(Math.floor(s/3600)).padStart(2,'0') + ':' +
+         String(Math.floor((s%3600)/60)).padStart(2,'0') + ':' +
+         String(Math.floor(s%60)).padStart(2,'0');
+}
+function fmtDuration(s) {
+  if (s < 60)   return s + 's';
+  if (s < 3600) return Math.round(s/60) + 'm';
+  return (s/3600).toFixed(1) + 'h';
+}
+
+// ============================================================
+// DOM HELPERS
+// ============================================================
+function set(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+function setGauge(name, pct) {
+  set('gv-' + name, Math.round(pct) + '%');
+  const f = document.getElementById('gf-' + name);
+  if (f) f.style.width = pct + '%';
+}
+function setMcPct(id, pct) {
+  const el = document.getElementById(id);
+  if (el) el.style.setProperty('--mc-pct', Math.round(pct) + '%');
+}
+function setScore(name, val, color) {
+  set('sc-' + name, Math.round(val));
+  const f = document.getElementById('sf-' + name);
+  if (f) { f.style.width = val + '%'; f.style.background = color; }
+}
+function setBadge(id, cond, trueText, falseText, trueClass, falseClass) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = cond ? trueText : falseText;
+  el.className = 'badge ' + (cond ? trueClass : falseClass);
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+window.addEventListener('load', () => {
+  initScope();
+  init3D();
+
+  // Determine host
+  const h = location.hostname;
+  if (h && h !== 'localhost' && h !== '127.0.0.1') {
+    espHost = h; // served directly from ESP
+    connectWS();
+  } else if (espHost) {
+    connectWS();
+  } else {
+    showModal();
+  }
+
+  startTermPoll();
+});
+</script>
+</body>
+</html>
