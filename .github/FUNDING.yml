@@ -1,0 +1,9 @@
+# GitHub Funding Configuration File
+# This file enables the "Sponsor" button on your GitHub repository page.
+# Uncomment the platforms you use and replace the placeholders with your usernames/URLs.
+
+# github: [srinadhpeddinti] # Replace with your GitHub username if you apply for GitHub Sponsors
+# patreon: your_patreon_username # Replace with your Patreon username
+# ko_fi: your_kofi_username # Replace with your Ko-fi username
+# buy_me_a_coffee: your_buymeacoffee_username # Replace with your Buy Me A Coffee username
+# custom: ['https://www.paypal.me/your_username'] # Replace with your custom link (e.g. PayPal)
