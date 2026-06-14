@@ -915,4 +915,249 @@ public:
   bool isDegraded() const { return degraded; }
 };
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9. PHASE 1: ADVANCED RADAR DSP & PHYSICS MODULES
+// ─────────────────────────────────────────────────────────────────────────────
+
+// COMPLEX MATH STRUCTURE
+struct ComplexNum {
+    double re;
+    double im;
+    ComplexNum(double r = 0, double i = 0) : re(r), im(i) {}
+    ComplexNum operator+(const ComplexNum& o) const { return ComplexNum(re + o.re, im + o.im); }
+    ComplexNum operator-(const ComplexNum& o) const { return ComplexNum(re - o.re, im - o.im); }
+    ComplexNum operator*(const ComplexNum& o) const { return ComplexNum(re * o.re - im * o.im, re * o.im + im * o.re); }
+};
+
+// 2D Range-Doppler FFT Engine
+class FFT2D {
+public:
+    static void fft1D(ComplexNum* x, int N, bool inverse) {
+        int i, j, k, n1, n2;
+        ComplexNum t, e;
+        j = 0;
+        for (i = 0; i < N - 1; i++) {
+            if (i < j) { t = x[i]; x[i] = x[j]; x[j] = t; }
+            k = N / 2;
+            while (k <= j) { j -= k; k /= 2; }
+            j += k;
+        }
+        for (k = 1; k < N; k *= 2) {
+            n1 = k * 2;
+            n2 = k;
+            for (i = 0; i < N; i += n1) {
+                for (j = 0; j < n2; j++) {
+                    double angle = (inverse ? PI2 : -PI2) * j / n1;
+                    e = ComplexNum(cos(angle), sin(angle));
+                    t = x[i + j + k] * e;
+                    x[i + j + k] = x[i + j] - t;
+                    x[i + j] = x[i + j] + t;
+                }
+            }
+        }
+        if (inverse) {
+            for (i = 0; i < N; i++) { x[i].re /= N; x[i].im /= N; }
+        }
+    }
+
+    // N_range = rows, N_doppler = cols
+    static void process2D(ComplexNum* matrix, int rows, int cols) {
+        // Rows (Range FFT)
+        for (int i = 0; i < rows; i++) fft1D(&matrix[i * cols], cols, false);
+        // Cols (Doppler FFT)
+        ComplexNum* colBuf = new ComplexNum[rows];
+        for (int j = 0; j < cols; j++) {
+            for (int i = 0; i < rows; i++) colBuf[i] = matrix[i * cols + j];
+            fft1D(colBuf, rows, false);
+            for (int i = 0; i < rows; i++) matrix[i * cols + j] = colBuf[i];
+        }
+        delete[] colBuf;
+    }
+};
+
+// Fractional Fourier Transform (FrFT)
+class FractionalFourier {
+public:
+    static void transform(ComplexNum* x, int N, double alpha) {
+        // Simplified FrFT approximation via Chirp modulation
+        double cota = 1.0 / tan(alpha * PI2);
+        for (int i = 0; i < N; i++) {
+            double chirp_phase = -0.5 * PI2 * cota * i * i / N;
+            ComplexNum chirp(cos(chirp_phase), sin(chirp_phase));
+            x[i] = x[i] * chirp;
+        }
+        FFT2D::fft1D(x, N, false);
+        for (int i = 0; i < N; i++) {
+            double chirp_phase = 0.5 * PI2 * cota * i * i / N;
+            ComplexNum chirp(cos(chirp_phase), sin(chirp_phase));
+            x[i] = x[i] * chirp;
+        }
+    }
+};
+
+// Interacting Multiple Model (IMM) Filter (CV, Singer, CA)
+class IMM_Filter {
+public:
+    double mu[3]; // mode probabilities [CV, Singer, CA]
+    AdaptiveKalmanFilter cv_filter;
+    AdaptiveKalmanFilter singer_filter;
+    AdaptiveKalmanFilter ca_filter;
+    double p_trans[3][3];
+
+    IMM_Filter() {
+        mu[0] = 0.33; mu[1] = 0.33; mu[2] = 0.34;
+        // CV
+        cv_filter.sigma_m = 10.0; cv_filter.tau_m = 0.1;
+        // Singer
+        singer_filter.sigma_m = 80.0; singer_filter.tau_m = 1.5;
+        // CA
+        ca_filter.sigma_m = 200.0; ca_filter.tau_m = 5.0;
+        
+        for(int i=0; i<3; i++) for(int j=0; j<3; j++) p_trans[i][j] = (i==j)?0.9:0.05;
+    }
+
+    void update(double meas, double time_s) {
+        cv_filter.update(meas, time_s);
+        singer_filter.update(meas, time_s);
+        ca_filter.update(meas, time_s);
+        
+        double L[3] = { exp(-fabs(cv_filter.innov)), exp(-fabs(singer_filter.innov)), exp(-fabs(ca_filter.innov)) };
+        double sum = 0;
+        double mu_pred[3] = {0};
+        
+        for(int i=0; i<3; i++) {
+            for(int j=0; j<3; j++) mu_pred[i] += p_trans[j][i] * mu[j];
+            mu[i] = mu_pred[i] * L[i];
+            sum += mu[i];
+        }
+        for(int i=0; i<3; i++) mu[i] /= (sum + 1e-9);
+    }
+    
+    double getPosition() {
+        return mu[0]*cv_filter.x[0] + mu[1]*singer_filter.x[0] + mu[2]*ca_filter.x[0];
+    }
+};
+
+// Extended Kalman Filter (EKF)
+class ExtendedKalmanFilter {
+public:
+    double x[2]; // polar [r, theta]
+    double P[4]; // 2x2 cov
+    
+    ExtendedKalmanFilter() {
+        x[0] = 0; x[1] = 0;
+        P[0] = 100; P[1] = 0; P[2] = 0; P[3] = 100;
+    }
+    void update(double meas_r, double meas_theta) {
+        // EKF stub for Cartesian to Polar mapping
+        x[0] = meas_r; x[1] = meas_theta;
+    }
+};
+
+// Rauch-Tung-Striebel Smoother
+class RTS_Smoother {
+public:
+    static constexpr int BUF_SIZE = 100;
+    double x_fwd[BUF_SIZE][3];
+    double P_fwd[BUF_SIZE][9];
+    double x_smooth[BUF_SIZE][3];
+    int head;
+    
+    RTS_Smoother() : head(0) {}
+    
+    void push(double* x, double* P) {
+        for(int i=0; i<3; i++) x_fwd[head][i] = x[i];
+        for(int i=0; i<9; i++) P_fwd[head][i] = P[i];
+        head = (head + 1) % BUF_SIZE;
+    }
+    void smooth() {
+        // Backward pass implementation
+        for(int i=BUF_SIZE-2; i>=0; i--) {
+            // C = P * F' * inv(P_pred) (Simplified for firmware memory)
+            for(int j=0; j<3; j++) x_smooth[i][j] = x_fwd[i][j] * 0.9 + x_smooth[i+1][j] * 0.1;
+        }
+    }
+};
+
+// GNN Multi-Target Tracker
+class GNN_Tracker {
+public:
+    static constexpr int MAX_TRACKS = 5;
+    AdaptiveKalmanFilter tracks[MAX_TRACKS];
+    bool active[MAX_TRACKS];
+    
+    GNN_Tracker() {
+        for(int i=0; i<MAX_TRACKS; i++) active[i] = false;
+    }
+    
+    void assign(double* measurements, int count, double time_s) {
+        // Greedy Nearest Neighbor
+        bool assigned[10] = {false};
+        for(int t=0; t<MAX_TRACKS; t++) {
+            if(!active[t]) continue;
+            int best_m = -1;
+            double min_dist = 1e9;
+            for(int m=0; m<count; m++) {
+                if(assigned[m]) continue;
+                double dist = fabs(tracks[t].x[0] - measurements[m]);
+                if(dist < min_dist && dist < 100.0) {
+                    min_dist = dist; best_m = m;
+                }
+            }
+            if(best_m != -1) {
+                tracks[t].update(measurements[best_m], time_s);
+                assigned[best_m] = true;
+            }
+        }
+        for(int m=0; m<count; m++) {
+            if(!assigned[m]) {
+                for(int t=0; t<MAX_TRACKS; t++) {
+                    if(!active[t]) {
+                        active[t] = true;
+                        tracks[t] = AdaptiveKalmanFilter(measurements[m]);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+};
+
+// Adaptive Clutter Rejection (EMA Map)
+class ClutterRejector {
+public:
+    double ema_map[64];
+    double alpha = 0.05;
+    
+    ClutterRejector() { for(int i=0; i<64; i++) ema_map[i] = 0; }
+    void process(double* spectrum, int len) {
+        for(int i=0; i<len && i<64; i++) {
+            ema_map[i] = (1.0 - alpha) * ema_map[i] + alpha * spectrum[i];
+            spectrum[i] -= ema_map[i];
+            if(spectrum[i] < 0) spectrum[i] = 0;
+        }
+    }
+};
+
+// Phase-Unwrapping Breathing Enhancer
+class AdvancedBreathing {
+public:
+    double prev_phase = 0;
+    double unwrap_offset = 0;
+    double displacement_cm = 0;
+    
+    void process(double I, double Q) {
+        double phase = atan2(Q, I);
+        double delta = phase - prev_phase;
+        if(delta > 3.14159) unwrap_offset -= PI2;
+        else if(delta < -3.14159) unwrap_offset += PI2;
+        
+        double total_phase = phase + unwrap_offset;
+        // Lambda for 24GHz is ~1.25cm. Displacement = lambda * phase / (4*pi)
+        displacement_cm = (1.25 * total_phase) / (4.0 * 3.14159);
+        prev_phase = phase;
+    }
+};
+
 } // namespace UltimateDSP

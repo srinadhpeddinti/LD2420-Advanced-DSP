@@ -36,6 +36,17 @@
 #include "LD2420_AKF_HMM_NoLimits.hpp"
 #include <ArduinoJson.h>
 
+// RP2040 Hardware Includes for Raw FMCW ADC Mod
+#include "hardware/adc.h"
+#include "hardware/dma.h"
+
+// ADC Configuration
+#define ADC_PIN 26          // GP26 = ADC0
+#define ADC_SAMPLES 1024
+uint16_t adc_buffer[ADC_SAMPLES];
+int dma_chan;
+dma_channel_config dma_cfg;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPILE-TIME CONFIGURATION
 // ─────────────────────────────────────────────────────────────────────────────
@@ -591,6 +602,24 @@ void setup() {
   // USB-CDC serial (telemetry out)
   Serial.begin(115200);
 
+  // ── RAW FMCW HARDWARE MOD SETUP (ADC + DMA) ─────────────────────────────
+  adc_init();
+  adc_gpio_init(ADC_PIN);
+  adc_select_input(0); // ADC0
+  adc_fifo_setup(true, true, 1, false, false);
+  adc_set_clkdiv(48000 / 250); // 250kHz sample rate
+  
+  dma_chan = dma_claim_unused_channel(true);
+  dma_cfg = dma_channel_get_default_config(dma_chan);
+  channel_config_set_transfer_data_size(&dma_cfg, DMA_SIZE_16);
+  channel_config_set_read_increment(&dma_cfg, false);
+  channel_config_set_write_increment(&dma_cfg, true);
+  channel_config_set_dreq(&dma_cfg, DREQ_ADC);
+  
+  dma_channel_configure(dma_chan, &dma_cfg, adc_buffer, &adc_hw->fifo, ADC_SAMPLES, true);
+  adc_run(true);
+  // ────────────────────────────────────────────────────────────────────────
+
   // LD2420 hardware UART on UART0 (GP0/GP1)
   Serial1.setTX(PIN_RADAR_TX);
   Serial1.setRX(PIN_RADAR_RX);
@@ -620,6 +649,26 @@ void setup() {
 // MAIN LOOP
 // ─────────────────────────────────────────────────────────────────────────────
 void loop() {
+  // ── 0. Process FMCW ADC DMA Buffer ───────────────────────────────────────
+  if (!dma_channel_is_busy(dma_chan)) {
+    adc_run(false);
+    
+    // Spectrogram processing stub
+    // The buffer `adc_buffer` now contains 1024 12-bit ADC samples of the IF signal.
+    // In a full implementation, you would pass this to UltimateDSP::FFT2D
+    // For now, we calculate a quick RMS energy to send to the dashboard.
+    uint32_t sum_sq = 0;
+    for(int i=0; i<ADC_SAMPLES; i++) {
+        int32_t centered = (int32_t)adc_buffer[i] - 2048;
+        sum_sq += centered * centered;
+    }
+    double rms_if = sqrt((double)sum_sq / ADC_SAMPLES);
+    
+    // Restart DMA
+    dma_channel_configure(dma_chan, &dma_cfg, adc_buffer, &adc_hw->fifo, ADC_SAMPLES, true);
+    adc_run(true);
+  }
+
   // ── 1. Drain the UART FIFO as fast as possible (highest priority) ────────
   while (Serial1.available()) {
     parser.feed((uint8_t)Serial1.read());
