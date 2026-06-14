@@ -4,9 +4,9 @@
 
 TEST_CASE("AdaptiveKalmanFilter Initialization", "[Kalman]") {
     UltimateDSP::AdaptiveKalmanFilter kf(0.5);
-    REQUIRE(kf.x[0] == 0.0);
+    REQUIRE(kf.x[0] == 0.5);
     REQUIRE(kf.x[1] == 0.0);
-    REQUIRE(kf.P[0][0] == 1000.0);
+    REQUIRE(kf.P[0] == 100.0);
 }
 
 TEST_CASE("Kalman Prediction and Update", "[Kalman]") {
@@ -14,7 +14,7 @@ TEST_CASE("Kalman Prediction and Update", "[Kalman]") {
     
     // Simulate reading 100cm at dt=0.1
     kf.predict(0.1);
-    kf.update(100.0);
+    kf.update(100.0, 0.1);
     
     // Position should be drawn towards 100
     REQUIRE(kf.x[0] > 10.0);

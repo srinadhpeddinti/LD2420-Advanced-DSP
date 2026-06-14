@@ -21,7 +21,9 @@ jobs:
             source-url: "https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json"
         libraries: |
           - name: ArduinoJson
-          - source-path: "./libraries/LD2420_Ultimate"
+        cli-compile-flags: |
+          - --library
+          - ./libraries/LD2420_Ultimate
         sketch-paths: |
           - firmware/LD2420_Pico_Ultimate/LD2420_Pico_Ultimate.ino
 

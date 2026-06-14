@@ -1237,16 +1237,16 @@ public:
         double innov_sq = innovation * innovation;
         smoothed_innovation_sq = 0.9 * smoothed_innovation_sq + 0.1 * innov_sq;
         
-        if(smoothed_innovation_sq > filter.sigma_r * 2) {
+        if(smoothed_innovation_sq > filter.R * 2) {
             // Reward: Expanding R (measurement noise) reduces innovation spikes
-            filter.sigma_r += learning_rate * filter.sigma_r;
-        } else if (smoothed_innovation_sq < filter.sigma_r * 0.5) {
-            filter.sigma_r -= learning_rate * filter.sigma_r;
+            filter.R += learning_rate * filter.R;
+        } else if (smoothed_innovation_sq < filter.R * 0.5) {
+            filter.R -= learning_rate * filter.R;
         }
         
         // Boundaries to prevent filter collapse
-        if(filter.sigma_r < 1.0) filter.sigma_r = 1.0;
-        if(filter.sigma_r > 500.0) filter.sigma_r = 500.0;
+        if(filter.R < 1.0) filter.R = 1.0;
+        if(filter.R > 500.0) filter.R = 500.0;
     }
 };
 
