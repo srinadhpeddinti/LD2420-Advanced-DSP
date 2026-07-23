@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Compile LD2420_Pico_Ultimate.ino
       uses: arduino/compile-sketches@v1
@@ -28,7 +28,7 @@ jobs:
           - firmware/LD2420_Pico_Ultimate/LD2420_Pico_Ultimate.ino
 
     - name: Upload UF2 Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: LD2420_Firmware
         path: build/**/*.uf2
@@ -36,7 +36,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Install Catch2 and Valgrind
       run: sudo apt-get update && sudo apt-get install -y cmake valgrind
     - name: Build Tests
