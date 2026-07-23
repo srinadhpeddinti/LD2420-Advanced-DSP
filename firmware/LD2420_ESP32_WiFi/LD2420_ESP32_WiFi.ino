@@ -883,8 +883,18 @@ void setup() {
     httpServer.on("/",                 handleRoot);
     httpServer.on("/api/data",         handleApiData);
     httpServer.on("/api/hex",          handleApiHex);
-    httpServer.on("/api/cmd",          handleApiCmd);
-    httpServer.on("/api/thresholds",   handleApiThresholds);
+    httpServer.on("/api/cmd",          HTTP_POST, handleApiCmd);
+    httpServer.on("/api/cmd",          HTTP_OPTIONS, []() {
+        httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+        httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        httpServer.send(204);
+    });
+    httpServer.on("/api/thresholds",   HTTP_POST, handleApiThresholds);
+    httpServer.on("/api/thresholds",   HTTP_OPTIONS, []() {
+        httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+        httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        httpServer.send(204);
+    });
     httpServer.begin();
 
     // WebSocket

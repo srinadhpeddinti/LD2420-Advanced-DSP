@@ -992,12 +992,12 @@ function apiBase() {
   if (location.protocol === 'http:') return '';
   return 'http://' + espHost;
 }
-function apiFetch(path) {
-  return fetch(apiBase() + path);
+function apiFetch(path, options = {}) {
+  return fetch(apiBase() + path, options);
 }
 function sendCmd(action) {
   if (!espHost) { termLog('[WARN] No ESP host configured.'); return; }
-  apiFetch('/api/cmd?action=' + action)
+  apiFetch('/api/cmd?action=' + action, { method: 'POST' })
     .then(r => r.ok ? r.text() : Promise.reject(r.status))
     .then(() => termLog('[CMD] Sent: ' + action.toUpperCase()))
     .catch(e  => termLog('[ERR] Command failed: ' + e));
@@ -1007,7 +1007,7 @@ function applyThresholds() {
   const m = document.getElementById('sl-motion').value;
   const s = document.getElementById('sl-static').value;
   const v = document.getElementById('sl-sens').value;
-  apiFetch('/api/thresholds?motion_cm=' + m + '&static_cm=' + s + '&sensitivity=' + v)
+  apiFetch('/api/thresholds?motion_cm=' + m + '&static_cm=' + s + '&sensitivity=' + v, { method: 'POST' })
     .then(r => r.ok ? r.text() : Promise.reject(r.status))
     .then(() => termLog('[CFG] Thresholds → motion=' + m + 'cm static=' + s + 'cm sens=' + v))
     .catch(e  => termLog('[ERR] Threshold update failed: ' + e));
