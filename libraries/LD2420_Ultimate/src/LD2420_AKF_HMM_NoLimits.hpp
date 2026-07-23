@@ -296,17 +296,16 @@ public:
   bool initialized;
   uint32_t update_count;
 
-  static constexpr double A_INIT[HMM_STATES][HMM_STATES] = {
-      {0.950, 0.020, 0.015, 0.010, 0.004, 0.001},
-      {0.005, 0.900, 0.070, 0.020, 0.005, 0.000},
-      {0.005, 0.020, 0.880, 0.070, 0.022, 0.003},
-      {0.005, 0.005, 0.060, 0.870, 0.055, 0.005},
-      {0.005, 0.002, 0.015, 0.060, 0.880, 0.038},
-      {0.005, 0.000, 0.005, 0.020, 0.080, 0.890}
-  };
-
   MarkovActivityEngine() : initialized(false), update_count(0) {
-    memcpy(A, A_INIT, sizeof(A));
+    const double init_vals[HMM_STATES][HMM_STATES] = {
+        {0.950, 0.020, 0.015, 0.010, 0.004, 0.001},
+        {0.005, 0.900, 0.070, 0.020, 0.005, 0.000},
+        {0.005, 0.020, 0.880, 0.070, 0.022, 0.003},
+        {0.005, 0.005, 0.060, 0.870, 0.055, 0.005},
+        {0.005, 0.002, 0.015, 0.060, 0.880, 0.038},
+        {0.005, 0.000, 0.005, 0.020, 0.080, 0.890}
+    };
+    memcpy(A, init_vals, sizeof(A));
 
     // Equal prior (will adapt)
     for (int i = 0; i < HMM_STATES; i++)
