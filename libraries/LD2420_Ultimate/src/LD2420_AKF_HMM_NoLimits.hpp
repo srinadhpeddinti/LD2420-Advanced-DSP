@@ -127,12 +127,17 @@ public:
                 dt * (1.0 - e2) / (2.0 * tau_m * tau_m) +
                 tau_m * (1.0 - e2) / (2.0) - tau_m * tau_m * (1.0 - e) / tau_m);
     // Simplified but real Singer covariance cross-terms:
-    Q[0] = q * (pow(dt, 5) / 20.0); // pos-pos (dominant term)
-    Q[1] = q * (pow(dt, 4) / 8.0);  // pos-vel
-    Q[2] = q * (pow(dt, 3) / 6.0);  // pos-acc
+    // Performance optimization: avoid pow() for small integer exponents
+    double dt2 = dt * dt;
+    double dt3 = dt2 * dt;
+    double dt4 = dt3 * dt;
+    double dt5 = dt4 * dt;
+    Q[0] = q * (dt5 / 20.0); // pos-pos (dominant term)
+    Q[1] = q * (dt4 / 8.0);  // pos-vel
+    Q[2] = q * (dt3 / 6.0);  // pos-acc
     Q[3] = Q[1];                    // vel-pos (symmetric)
-    Q[4] = q * (pow(dt, 3) / 3.0);  // vel-vel
-    Q[5] = q * (dt * dt / 2.0);     // vel-acc
+    Q[4] = q * (dt3 / 3.0);  // vel-vel
+    Q[5] = q * (dt2 / 2.0);     // vel-acc
     Q[6] = Q[2];
     Q[7] = Q[5];
     Q[8] = q * dt; // acc-acc
