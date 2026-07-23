@@ -24,6 +24,8 @@ jobs:
         cli-compile-flags: |
           - --library
           - ./libraries/LD2420_Ultimate
+          - --build-property
+          - compiler.cpp.extra_flags=-I{build.source.path}/libraries/LD2420_Ultimate/src
         sketch-paths: |
           - firmware/LD2420_Pico_Ultimate/LD2420_Pico_Ultimate.ino
 
