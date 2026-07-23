@@ -11,6 +11,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Catch2)
 
-add_executable(kalman_tests test_kalman.cpp)
+add_executable(kalman_tests test_kalman.cpp fix_linker.cpp)
 target_include_directories(kalman_tests PRIVATE ../libraries/LD2420_Ultimate/src)
 target_link_libraries(kalman_tests PRIVATE Catch2::Catch2WithMain)
