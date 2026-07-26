@@ -807,9 +807,18 @@ void handleApiCmd() {
 
 void handleApiThresholds() {
     httpServer.sendHeader("Access-Control-Allow-Origin", "*");
-    if (httpServer.hasArg("motion_cm"))    threshold_motion_cm = httpServer.arg("motion_cm").toInt();
-    if (httpServer.hasArg("static_cm"))    threshold_static_cm = httpServer.arg("static_cm").toInt();
-    if (httpServer.hasArg("sensitivity"))  sensitivity_level   = httpServer.arg("sensitivity").toInt();
+    if (httpServer.hasArg("motion_cm")) {
+        int val = httpServer.arg("motion_cm").toInt();
+        if (val >= 50 && val <= 800) threshold_motion_cm = val;
+    }
+    if (httpServer.hasArg("static_cm")) {
+        int val = httpServer.arg("static_cm").toInt();
+        if (val >= 50 && val <= 600) threshold_static_cm = val;
+    }
+    if (httpServer.hasArg("sensitivity")) {
+        int val = httpServer.arg("sensitivity").toInt();
+        if (val >= 1 && val <= 10) sensitivity_level = val;
+    }
     httpServer.send(200, "text/plain", "OK");
 }
 
