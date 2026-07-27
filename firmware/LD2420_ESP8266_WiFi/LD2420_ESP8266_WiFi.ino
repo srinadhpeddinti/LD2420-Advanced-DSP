@@ -864,7 +864,19 @@ void setup() {
     });
     
     Serial.println("[WIFI] Connecting or starting AP...");
-    if (!wifiManager.autoConnect(AP_SSID, AP_PASS)) {
+
+    // Sentinel: Dynamic AP password generation to avoid hardcoded secrets
+    String apPassword = String(AP_PASS);
+    if (apPassword == "YOUR_SETUP_PASSWORD") {
+        uint8_t mac[6];
+        WiFi.macAddress(mac);
+        char passBuf[16];
+        snprintf(passBuf, sizeof(passBuf), "LD2420_%02X%02X%02X", mac[3], mac[4], mac[5]);
+        apPassword = String(passBuf);
+        Serial.printf("[WIFI] 🛡️ Sentinel: Using dynamic AP Password: %s\n", apPassword.c_str());
+    }
+
+    if (!wifiManager.autoConnect(AP_SSID, apPassword.c_str())) {
         Serial.println("[WIFI] Failed to connect and hit timeout. Rebooting...");
         delay(3000);
         ESP.restart();
