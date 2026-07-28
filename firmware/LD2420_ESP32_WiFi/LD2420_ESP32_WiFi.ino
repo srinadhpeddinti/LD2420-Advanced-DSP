@@ -60,7 +60,7 @@
 
 // Captive Portal AP Name
 const char* AP_SSID          = "LD2420_Setup";
-const char* AP_PASS          = "YOUR_SETUP_PASSWORD";
+String ap_pass               = ""; // Dynamically generated in setup()
 
 // MQTT (optional — set to "" to disable)
 #if ENABLE_MQTT
@@ -858,13 +858,22 @@ void setup() {
     // WiFiManager - Secure Captive Portal
     WiFiManager wifiManager;
     // wifiManager.resetSettings(); // Uncomment to wipe saved credentials for testing
+
+    // Generate unique AP password based on MAC address
+    String mac = WiFi.macAddress();
+    String mac_no_colons = "";
+    for (int i = 0; i < mac.length(); i++) {
+        if (mac[i] != ':') mac_no_colons += mac[i];
+    }
+    ap_pass = "setup_" + mac_no_colons.substring(mac_no_colons.length() - 6);
+
     wifiManager.setAPCallback([](WiFiManager *myWiFiManager) {
         Serial.println("[WIFI] Entering Setup Mode");
-        Serial.printf("[AP] Connect to SSID: %s to configure WiFi\n", myWiFiManager->getConfigPortalSSID().c_str());
+        Serial.printf("[AP] Connect to SSID: %s with Password: %s to configure WiFi\n", myWiFiManager->getConfigPortalSSID().c_str(), ap_pass.c_str());
     });
     
     Serial.println("[WIFI] Connecting or starting AP...");
-    if (!wifiManager.autoConnect(AP_SSID, AP_PASS)) {
+    if (!wifiManager.autoConnect(AP_SSID, ap_pass.c_str())) {
         Serial.println("[WIFI] Failed to connect and hit timeout. Rebooting...");
         delay(3000);
         ESP.restart();
