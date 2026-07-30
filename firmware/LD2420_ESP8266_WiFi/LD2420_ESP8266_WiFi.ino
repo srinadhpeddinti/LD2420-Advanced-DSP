@@ -90,6 +90,8 @@ SoftwareSerial radarSerial(PIN_RADAR_RX, PIN_RADAR_TX); // RX, TX
 
 ESP8266WebServer httpServer(80);
 WebSocketsServer wsServer(81);
+uint32_t last_api_post_ms = 0;
+
 #if ENABLE_MQTT
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
@@ -784,6 +786,12 @@ void handleApiHex() {
 
 void handleApiCmd() {
     httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    if (millis() - last_api_post_ms < 1000) {
+        httpServer.send(429, "text/plain", "Too Many Requests");
+        return;
+    }
+    last_api_post_ms = millis();
+
     if (!httpServer.hasArg("action")) {
         httpServer.send(400, "text/plain", "Missing action");
         return;
@@ -807,6 +815,12 @@ void handleApiCmd() {
 
 void handleApiThresholds() {
     httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    if (millis() - last_api_post_ms < 1000) {
+        httpServer.send(429, "text/plain", "Too Many Requests");
+        return;
+    }
+    last_api_post_ms = millis();
+
     if (httpServer.hasArg("motion_cm"))    threshold_motion_cm = httpServer.arg("motion_cm").toInt();
     if (httpServer.hasArg("static_cm"))    threshold_static_cm = httpServer.arg("static_cm").toInt();
     if (httpServer.hasArg("sensitivity"))  sensitivity_level   = httpServer.arg("sensitivity").toInt();
