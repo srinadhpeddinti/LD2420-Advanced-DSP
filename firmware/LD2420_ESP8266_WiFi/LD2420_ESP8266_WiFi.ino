@@ -764,13 +764,20 @@ void mqttPublish() {
 // ================================================================================
 // WEB SERVER HANDLERS
 // ================================================================================
-void handleApiData() {
+void addSecurityHeaders() {
     httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    httpServer.sendHeader("X-Content-Type-Options", "nosniff");
+    httpServer.sendHeader("X-Frame-Options", "DENY");
+    httpServer.sendHeader("X-XSS-Protection", "1; mode=block");
+}
+
+void handleApiData() {
+    addSecurityHeaders();
     httpServer.send(200, "application/json", buildJsonPayload(true));
 }
 
 void handleApiHex() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    addSecurityHeaders();
     String out;
     out.reserve(SNAPSHOT_SIZE + 10);
     uint16_t start = snapIdx;
@@ -783,7 +790,7 @@ void handleApiHex() {
 }
 
 void handleApiCmd() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    addSecurityHeaders();
     if (!httpServer.hasArg("action")) {
         httpServer.send(400, "text/plain", "Missing action");
         return;
@@ -806,7 +813,7 @@ void handleApiCmd() {
 }
 
 void handleApiThresholds() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    addSecurityHeaders();
     if (httpServer.hasArg("motion_cm"))    threshold_motion_cm = httpServer.arg("motion_cm").toInt();
     if (httpServer.hasArg("static_cm"))    threshold_static_cm = httpServer.arg("static_cm").toInt();
     if (httpServer.hasArg("sensitivity"))  sensitivity_level   = httpServer.arg("sensitivity").toInt();
@@ -885,13 +892,13 @@ void setup() {
     httpServer.on("/api/hex",          handleApiHex);
     httpServer.on("/api/cmd",          HTTP_POST, handleApiCmd);
     httpServer.on("/api/cmd",          HTTP_OPTIONS, []() {
-        httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+        addSecurityHeaders();
         httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
         httpServer.send(204);
     });
     httpServer.on("/api/thresholds",   HTTP_POST, handleApiThresholds);
     httpServer.on("/api/thresholds",   HTTP_OPTIONS, []() {
-        httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+        addSecurityHeaders();
         httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
         httpServer.send(204);
     });
