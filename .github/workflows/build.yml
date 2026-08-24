@@ -22,6 +22,7 @@ jobs:
         libraries: |
           - name: ArduinoJson
           - source-path: ./libraries/LD2420_Ultimate
+          - name: "CMSIS-DSP"
         sketch-paths: |
           - firmware/LD2420_Pico_Ultimate
 
