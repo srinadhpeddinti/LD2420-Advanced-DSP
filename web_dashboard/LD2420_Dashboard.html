@@ -993,6 +993,11 @@ function apiBase() {
   return 'http://' + espHost;
 }
 function apiFetch(path, options = {}) {
+  // Inject CSRF protection header for state-modifying requests
+  if (options.method && options.method.toUpperCase() === 'POST') {
+    options.headers = options.headers || {};
+    options.headers['X-Requested-With'] = 'XMLHttpRequest';
+  }
   return fetch(apiBase() + path, options);
 }
 function sendCmd(action) {

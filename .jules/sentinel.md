@@ -2,3 +2,8 @@
 **Vulnerability:** CSRF vulnerability due to state-modifying endpoints (/api/cmd and /api/thresholds) allowing simple GET requests.
 **Learning:** In simple ESP-based web servers, it is common to define routes without a specific HTTP method restriction. This allows unintended state changes via cross-origin GET requests.
 **Prevention:** Always specify HTTP_POST as the method for state-modifying endpoints in the httpServer.on definition, and ensure CORS preflight OPTIONS requests are handled to support legitimate client applications.
+
+## 2024-05-24 - CORS wildcard combined with lacking CSRF protections
+**Vulnerability:** The firmware web servers (ESP8266 and ESP32) were configured to send `Access-Control-Allow-Origin: *` unconditionally, and lacked CSRF token or header verification on state-modifying POST requests (`/api/cmd` and `/api/thresholds`).
+**Learning:** Combining CORS wildcards with state-modifying endpoints in local network devices opens them up to attack from malicious public websites visited by users on the same network. A common defense in depth approach is dynamic validation of the Origin header against safe local IP prefixes, combined with a custom header requirement (`X-Requested-With`) on POST requests that triggers browsers to perform an OPTIONS preflight request.
+**Prevention:** Remove `Access-Control-Allow-Origin: *`. Dynamically inspect the `Origin` header and echo it only if it originates from a trusted local prefix (`http://192.168.`, `http://10.`, `http://172.`, `http://localhost`). For POST requests, enforce the presence of a custom header like `X-Requested-With: XMLHttpRequest`. Remember to call `httpServer.collectHeaders()` in `setup()` to make these headers available for inspection.
