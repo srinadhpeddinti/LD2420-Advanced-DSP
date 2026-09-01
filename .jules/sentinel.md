@@ -1,4 +1,4 @@
-## 2024-05-18 - State-modifying API endpoints allowing GET requests
-**Vulnerability:** CSRF vulnerability due to state-modifying endpoints (/api/cmd and /api/thresholds) allowing simple GET requests.
-**Learning:** In simple ESP-based web servers, it is common to define routes without a specific HTTP method restriction. This allows unintended state changes via cross-origin GET requests.
-**Prevention:** Always specify HTTP_POST as the method for state-modifying endpoints in the httpServer.on definition, and ensure CORS preflight OPTIONS requests are handled to support legitimate client applications.
+## 2023-11-20 - Insecure CORS and CSRF Protection
+**Vulnerability:** The application used a wildcard `Access-Control-Allow-Origin: *` CORS policy combined with a lack of CSRF protection on state-modifying endpoints (POST). This allows an attacker to change the device configuration or issue commands from malicious websites via cross-site request forgery.
+**Learning:** Using simple string prefix checks like `startsWith("http://192.168.")` to validate origins is dangerous and easily bypassed (e.g., `http://192.168.attacker.com`). Furthermore, removing wildcard CORS will break locally-opened `file://` UI files if `null` origins are not explicitly whitelisted.
+**Prevention:** Implement custom header checks (e.g., `X-Requested-With`) for CSRF defense. Validate CORS origins by carefully inspecting the host portion to ensure it consists only of digits, dots, and colons. Do not rely on simple prefix checking.
