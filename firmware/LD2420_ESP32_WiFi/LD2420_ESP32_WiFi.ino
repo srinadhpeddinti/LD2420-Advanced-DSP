@@ -762,15 +762,64 @@ void mqttPublish() {
 #endif
 
 // ================================================================================
+// SECURITY HELPERS
+// ================================================================================
+void setCorsHeaders() {
+    String origin = httpServer.header("Origin");
+    if (origin.length() == 0) return; // No Origin header, browser direct visit or same-origin (handled naturally)
+
+    // Extract hostname from origin
+    String host = origin;
+    if (host.startsWith("http://")) host = host.substring(7);
+    else if (host.startsWith("https://")) host = host.substring(8);
+    int portIdx = host.indexOf(':');
+    if (portIdx > 0) host = host.substring(0, portIdx);
+
+    // Validate hostname: must be localhost, ld2420.local, or a valid IP structure
+    bool isAllowed = false;
+    if (host == "localhost" || host == "ld2420.local") {
+        isAllowed = true;
+    } else {
+        // Simple check to ensure it's a numeric IP (preventing bypass like 192.168.attacker.com)
+        bool isIP = true;
+        for (unsigned int i = 0; i < host.length(); i++) {
+            if (!isdigit(host[i]) && host[i] != '.') {
+                isIP = false;
+                break;
+            }
+        }
+        if (isIP) {
+            if (host.startsWith("192.168.") || host.startsWith("10.") || host.startsWith("172.") || host.startsWith("127.")) {
+                isAllowed = true;
+            }
+        }
+    }
+
+    if (isAllowed) {
+        httpServer.sendHeader("Access-Control-Allow-Origin", origin);
+    }
+}
+
+bool checkCSRF() {
+    if (httpServer.method() == HTTP_POST) {
+        if (!httpServer.hasHeader("X-Requested-With") || httpServer.header("X-Requested-With") != "XMLHttpRequest") {
+            httpServer.send(403, "text/plain", "Forbidden: Missing or invalid X-Requested-With header");
+            return false;
+        }
+    }
+    return true;
+}
+
+// ================================================================================
 // WEB SERVER HANDLERS
 // ================================================================================
 void handleApiData() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    setCorsHeaders();
     httpServer.send(200, "application/json", buildJsonPayload(true));
 }
 
 void handleApiHex() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    setCorsHeaders();
     String out;
     out.reserve(SNAPSHOT_SIZE + 10);
     uint16_t start = snapIdx;
@@ -783,7 +832,9 @@ void handleApiHex() {
 }
 
 void handleApiCmd() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    setCorsHeaders();
+    if (!checkCSRF()) return;
+
     if (!httpServer.hasArg("action")) {
         httpServer.send(400, "text/plain", "Missing action");
         return;
@@ -806,7 +857,9 @@ void handleApiCmd() {
 }
 
 void handleApiThresholds() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    setCorsHeaders();
+    if (!checkCSRF()) return;
+
     if (httpServer.hasArg("motion_cm"))    threshold_motion_cm = httpServer.arg("motion_cm").toInt();
     if (httpServer.hasArg("static_cm"))    threshold_static_cm = httpServer.arg("static_cm").toInt();
     if (httpServer.hasArg("sensitivity"))  sensitivity_level   = httpServer.arg("sensitivity").toInt();
@@ -879,20 +932,26 @@ void setup() {
     }
     #endif
 
+    // Security headers required for parsing CSRF & CORS
+    const char* headerKeys[] = {"Origin", "X-Requested-With"};
+    httpServer.collectHeaders(headerKeys, 2);
+
     // HTTP routes
     httpServer.on("/",                 handleRoot);
     httpServer.on("/api/data",         handleApiData);
     httpServer.on("/api/hex",          handleApiHex);
     httpServer.on("/api/cmd",          HTTP_POST, handleApiCmd);
     httpServer.on("/api/cmd",          HTTP_OPTIONS, []() {
-        httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+        setCorsHeaders();
         httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        httpServer.sendHeader("Access-Control-Allow-Headers", "X-Requested-With");
         httpServer.send(204);
     });
     httpServer.on("/api/thresholds",   HTTP_POST, handleApiThresholds);
     httpServer.on("/api/thresholds",   HTTP_OPTIONS, []() {
-        httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+        setCorsHeaders();
         httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        httpServer.sendHeader("Access-Control-Allow-Headers", "X-Requested-With");
         httpServer.send(204);
     });
     httpServer.begin();
