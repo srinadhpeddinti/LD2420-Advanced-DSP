@@ -25,7 +25,7 @@ jobs:
           - --library
           - ./libraries/LD2420_Ultimate
         sketch-paths: |
-          - firmware/LD2420_Pico_Ultimate
+          - firmware/LD2420_Pico_Ultimate/
 
     - name: Upload UF2 Artifact
       uses: actions/upload-artifact@v4
