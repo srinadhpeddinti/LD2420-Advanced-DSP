@@ -21,10 +21,10 @@ jobs:
             source-url: "https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json"
         libraries: |
           - name: ArduinoJson
-        cli-compile-flags: |
+        cli-compile-flags:
           - --library
           - ./libraries/LD2420_Ultimate
-        sketch-paths: |
+        sketch-paths:
           - firmware/LD2420_Pico_Ultimate
 
     - name: Upload UF2 Artifact
