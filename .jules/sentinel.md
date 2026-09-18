@@ -11,3 +11,8 @@
 ## 2024-05-24 - arduino/compile-sketches GitHub Action Library Configuration
 **Learning:** The `arduino/compile-sketches` action does not properly resolve local library paths using `cli-compile-flags: - --library ...`. This causes fatal "No such file or directory" errors when the sketch attempts to include the local library header.
 **Action:** Always use the `libraries` array with `- source-path: <path-to-library>` instead of passing the library via CLI flags when configuring the `arduino/compile-sketches` GitHub Action.
+
+## 2024-05-24 - Missing Header Inclusion Guard for ARM Math Library
+**Vulnerability:** Not a security vulnerability, but a critical build failure. `arm_math.h` is conditionally included when `ARDUINO_ARCH_RP2040` is defined. However, some board cores or setups may not provide this CMSIS DSP header out of the box, causing compilation failures.
+**Learning:** Hard-failing when an optional/platform-specific header isn't present breaks CI and portability.
+**Prevention:** Wrap optional headers in `__has_include(<...>)` to prevent build breakage when compiling against cores that lack them.
