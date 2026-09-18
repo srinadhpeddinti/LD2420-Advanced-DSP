@@ -28,9 +28,7 @@ struct TelemetryPacket {
 };
 #pragma pack(pop)
 
-namespace AppLogic {
-
-inline void getTelemetryBinary(TelemetryPacket& pkt, const UltimateDSP::RadarState& radar) {
+inline void getTelemetryBinary(TelemetryPacket& pkt) {
     pkt.magic = 0xBEEF;
     pkt.presence = radar.presence_fused ? 1 : 0;
     pkt.activity = (uint8_t)radar.activity;
@@ -48,7 +46,7 @@ inline void getTelemetryBinary(TelemetryPacket& pkt, const UltimateDSP::RadarSta
     pkt.voice_prime = radar.voice_prime ? 1 : 0;
     for(int i=0; i<8; i++) pkt.zones[i] = (uint8_t)(radar.zone_prob[i] * 255.0);
     pkt.uptime_s = radar.uptime_s;
-    
+
     // simple checksum
     uint16_t cs = 0;
     uint8_t* ptr = (uint8_t*)&pkt;
@@ -69,18 +67,18 @@ inline void logActivityTransition(UltimateDSP::HMMState old_state, UltimateDSP::
 }
 
 
-#define TELEMETRY_HZ 10 
+#define TELEMETRY_HZ 10
 #define TELEMETRY_MS (1000 / TELEMETRY_HZ)
-#define BREATHING_ANALYZE_MS 2000   
-#define DOPPLER_ANALYZE_MS 1000     
-#define FALL_ALERT_HOLD_MS 5000     
-#define OT2_DEBOUNCE_MS 50          
-#define RANGE_SANITY_MAX_CM 800     
-#define RANGE_SANITY_MIN_CM 5       
-#define VELOCITY_OUTLIER_M_DIST 4.0 
-#define PRESENCE_TIMEOUT_MS 5000    
-#define STATIC_DETECT_VEL_CM 15     
-#define LED_BLINK_MS 100            
+#define BREATHING_ANALYZE_MS 2000
+#define DOPPLER_ANALYZE_MS 1000
+#define FALL_ALERT_HOLD_MS 5000
+#define OT2_DEBOUNCE_MS 50
+#define RANGE_SANITY_MAX_CM 800
+#define RANGE_SANITY_MIN_CM 5
+#define VELOCITY_OUTLIER_M_DIST 4.0
+#define PRESENCE_TIMEOUT_MS 5000
+#define STATIC_DETECT_VEL_CM 15
+#define LED_BLINK_MS 100
 
 #if defined(ARDUINO_ARCH_RP2040)
 #include "pico/mutex.h"
@@ -152,7 +150,7 @@ struct RadarState {
 
   // ML & Edge AI Output
   int posture_class;          // 0=Stand, 1=Sit, 2=Prone
-  bool pet_detected;          
+  bool pet_detected;
   double anomaly_score;       // 0.0 - 1.0
   int sleep_stage;            // 0=Awake, 1=Light, 2=Deep, 3=REM
   bool intent_leaving;        // Predictive door exit
@@ -563,7 +561,7 @@ inline void blinkLED() {
 // ─────────────────────────────────────────────────────────────────────────────
 inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
   // 1024 bytes is enough for this schema (~600 bytes serialized)
-  
+
 
   uint32_t now = millis();
   radar.uptime_s = now / 1000;
@@ -645,7 +643,7 @@ inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
   doc["uptime_s"] = radar.uptime_s;
 
   // Emit NDJSON to USB host
-  
+
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
