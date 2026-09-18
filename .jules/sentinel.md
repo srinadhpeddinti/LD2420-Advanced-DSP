@@ -16,3 +16,10 @@
 **Vulnerability:** Not a security vulnerability, but a critical build failure. `arm_math.h` is conditionally included when `ARDUINO_ARCH_RP2040` is defined. However, some board cores or setups may not provide this CMSIS DSP header out of the box, causing compilation failures.
 **Learning:** Hard-failing when an optional/platform-specific header isn't present breaks CI and portability.
 **Prevention:** Wrap optional headers in `__has_include(<...>)` to prevent build breakage when compiling against cores that lack them.
+
+## 2024-05-24 - Pico RP2040 Compilation Issues
+**Learning:** `arduino/compile-sketches` builds can fail due to multiple reasons:
+1.  **Missing `arm_math.h`**: Explicit platform condition required in header file when `<arm_math.h>` is not guaranteed to exist (added `__has_include` check).
+2.  **Redefinition of `PIN_LED`**: Arduino Pico core defines `PIN_LED` in `variants/rpipico/pins_arduino.h`. Firmware sketches must wrap manual definition of `PIN_LED` in `#ifndef PIN_LED` to avoid compiler warnings treating redefinitions as errors in strict CI pipelines.
+3.  **Namespacing issues**: Using classes/structs (like `TelemetryPacket`) outside of their expected namespaces, or incorrectly prefixing namespaces (`AppLogic::TelemetryPacket` vs `TelemetryPacket`) will cause build failures. Also, accessing static fields from a namespace from a global inline function in the same header caused scope errors. Passed state context directly to `getTelemetryBinary` function.
+**Action:** Verify `#ifndef` around pin definitions, ensure `#include <arm_math.h>` is wrapped safely, and watch out for namespace boundaries in inline helper functions.
