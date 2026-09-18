@@ -7,3 +7,7 @@
 **Vulnerability:** The API allowed unauthenticated POST requests from any origin (`Access-Control-Allow-Origin: *`) to state-changing endpoints without validating the source.
 **Learning:** Returning wildcard CORS headers and relying on `httpServer.hasArg()` allows malicious sites to craft hidden forms that execute state-modifying requests against local devices.
 **Prevention:** Dynamically validate the `Origin` header against internal/private IP blocks and enforce `X-Requested-With: XMLHttpRequest` on all POST requests to ensure they originated from a controlled JS environment and are subject to CORS preflights.
+
+## 2024-05-24 - arduino/compile-sketches GitHub Action Library Configuration
+**Learning:** The `arduino/compile-sketches` action does not properly resolve local library paths using `cli-compile-flags: - --library ...`. This causes fatal "No such file or directory" errors when the sketch attempts to include the local library header.
+**Action:** Always use the `libraries` array with `- source-path: <path-to-library>` instead of passing the library via CLI flags when configuring the `arduino/compile-sketches` GitHub Action.
