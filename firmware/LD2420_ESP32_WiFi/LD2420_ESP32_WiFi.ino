@@ -764,13 +764,33 @@ void mqttPublish() {
 // ================================================================================
 // WEB SERVER HANDLERS
 // ================================================================================
+bool applySecurityHeaders() {
+    String origin = httpServer.header("Origin");
+    bool safe = true;
+    if (origin.length() > 0) {
+        String h = origin;
+        if (h.startsWith("http://")) h = h.substring(7);
+        if (h.startsWith("https://")) h = h.substring(8);
+        int c = h.indexOf(':'); if (c > 0) h = h.substring(0, c);
+        String r = httpServer.header("Host");
+        int rc = r.indexOf(':'); if (rc > 0) r = r.substring(0, rc);
+        safe = (h == r || h == "localhost" || h.endsWith(".local"));
+        IPAddress ip;
+        if (!safe && ip.fromString(h)) safe = (ip[0]==10 || (ip[0]==172 && ip[1]>=16 && ip[1]<=31) || (ip[0]==192 && ip[1]==168) || ip[0]==127);
+    }
+    if (httpServer.method() == HTTP_POST && httpServer.header("X-Requested-With") != "XMLHttpRequest") safe = false;
+    if (safe && origin.length() > 0) httpServer.sendHeader("Access-Control-Allow-Origin", origin);
+    else if (safe) httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    return safe;
+}
+
 void handleApiData() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    if (!applySecurityHeaders()) { httpServer.send(403, "text/plain", "Forbidden"); return; }
     httpServer.send(200, "application/json", buildJsonPayload(true));
 }
 
 void handleApiHex() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    if (!applySecurityHeaders()) { httpServer.send(403, "text/plain", "Forbidden"); return; }
     String out;
     out.reserve(SNAPSHOT_SIZE + 10);
     uint16_t start = snapIdx;
@@ -783,7 +803,7 @@ void handleApiHex() {
 }
 
 void handleApiCmd() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    if (!applySecurityHeaders()) { httpServer.send(403, "text/plain", "Forbidden"); return; }
     if (!httpServer.hasArg("action")) {
         httpServer.send(400, "text/plain", "Missing action");
         return;
@@ -806,7 +826,7 @@ void handleApiCmd() {
 }
 
 void handleApiThresholds() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    if (!applySecurityHeaders()) { httpServer.send(403, "text/plain", "Forbidden"); return; }
     if (httpServer.hasArg("motion_cm"))    threshold_motion_cm = httpServer.arg("motion_cm").toInt();
     if (httpServer.hasArg("static_cm"))    threshold_static_cm = httpServer.arg("static_cm").toInt();
     if (httpServer.hasArg("sensitivity"))  sensitivity_level   = httpServer.arg("sensitivity").toInt();
@@ -880,19 +900,23 @@ void setup() {
     #endif
 
     // HTTP routes
+    const char * headerkeys[] = {"Host", "X-Requested-With", "Origin"};
+    httpServer.collectHeaders(headerkeys, 3);
     httpServer.on("/",                 handleRoot);
     httpServer.on("/api/data",         handleApiData);
     httpServer.on("/api/hex",          handleApiHex);
     httpServer.on("/api/cmd",          HTTP_POST, handleApiCmd);
     httpServer.on("/api/cmd",          HTTP_OPTIONS, []() {
-        httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+        httpServer.sendHeader("Access-Control-Allow-Origin", httpServer.header("Origin").length() > 0 ? httpServer.header("Origin") : "*");
         httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        httpServer.sendHeader("Access-Control-Allow-Headers", "X-Requested-With");
         httpServer.send(204);
     });
     httpServer.on("/api/thresholds",   HTTP_POST, handleApiThresholds);
     httpServer.on("/api/thresholds",   HTTP_OPTIONS, []() {
-        httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+        httpServer.sendHeader("Access-Control-Allow-Origin", httpServer.header("Origin").length() > 0 ? httpServer.header("Origin") : "*");
         httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        httpServer.sendHeader("Access-Control-Allow-Headers", "X-Requested-With");
         httpServer.send(204);
     });
     httpServer.begin();
