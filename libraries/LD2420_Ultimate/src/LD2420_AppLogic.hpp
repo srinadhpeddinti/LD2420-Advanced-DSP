@@ -193,6 +193,9 @@ uint32_t led_off_ms = 0;
 volatile bool ot2_raw = false;
 volatile uint32_t ot2_last_ms = 0;
 
+#ifndef IRAM_ATTR
+#define IRAM_ATTR
+#endif
 void IRAM_ATTR handleOT2() {
   uint32_t now = millis();
   if (now - ot2_last_ms > OT2_DEBOUNCE_MS) {
@@ -559,6 +562,16 @@ inline void blinkLED() {
 //   outliers            — Mahalanobis-rejected range spikes
 //   uptime_s            — system uptime in seconds
 // ─────────────────────────────────────────────────────────────────────────────
+inline void getTelemetryBinary(TelemetryPacket& pkt) {
+    pkt.presence = radar.presence_fused ? 1 : 0;
+    pkt.state = radar.presence_state;
+    pkt.activity = radar.activity;
+    pkt.distance_cm = distance_ema_cm;
+    pkt.velocity_cm_s = radar.velocity_cm_s;
+    pkt.energy_moving = radar.energy_moving;
+    pkt.energy_static = radar.energy_static;
+}
+
 inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
   // 1024 bytes is enough for this schema (~600 bytes serialized)
   
