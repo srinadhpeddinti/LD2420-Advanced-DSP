@@ -93,12 +93,12 @@ void loop1() {
     if (millis() - AppLogic::last_broadcast_ms >= TELEMETRY_MS) {
         AppLogic::last_broadcast_ms = millis();
         
-        TelemetryPacket pkt;
+        AppLogic::TelemetryPacket pkt;
         LOCK_RADAR();
-        getTelemetryBinary(pkt);
+        AppLogic::getTelemetryBinary(pkt);
         UNLOCK_RADAR();
         
-        Serial.write((const uint8_t*)&pkt, sizeof(TelemetryPacket));
+        Serial.write((const uint8_t*)&pkt, sizeof(AppLogic::TelemetryPacket));
         Serial.flush();
         AppLogic::blinkLED();
     }
