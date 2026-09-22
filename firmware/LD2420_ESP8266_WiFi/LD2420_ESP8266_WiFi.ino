@@ -810,6 +810,52 @@ void handleOptions() {
     httpServer.send(204);
 }
 
+
+bool checkSecurity(bool isPost) {
+    String org = httpServer.header("Origin");
+    if (org.isEmpty()) return true; // allow same-origin directly (no origin header)
+
+    // strip http(s)://
+    String h = org.startsWith("http://") ? org.substring(7) : (org.startsWith("https://") ? org.substring(8) : org);
+    // strip port if any
+    int colon = h.indexOf(':');
+    if (colon != -1) h = h.substring(0, colon);
+
+    IPAddress ip;
+    bool isLocalIP = ip.fromString(h) && (ip[0]==10 || ip[0]==127 || (ip[0]==192 && ip[1]==168) || (ip[0]==172 && ip[1]>=16 && ip[1]<=31));
+    bool validOrigin = (h == httpServer.header("Host") || h == "localhost" || h.endsWith(".local") || isLocalIP);
+
+    if (validOrigin) {
+        httpServer.sendHeader("Access-Control-Allow-Origin", org);
+    } else {
+        return false;
+    }
+
+    if (isPost && !httpServer.hasHeader("X-Requested-With")) {
+        httpServer.send(403, "text/plain", "CSRF failure");
+        return false;
+    }
+    return true;
+}
+
+void handleOptions() {
+    String org = httpServer.header("Origin");
+    String h = org.startsWith("http://") ? org.substring(7) : (org.startsWith("https://") ? org.substring(8) : org);
+    int colon = h.indexOf(':');
+    if (colon != -1) h = h.substring(0, colon);
+
+    IPAddress ip;
+    bool isLocalIP = ip.fromString(h) && (ip[0]==10 || ip[0]==127 || (ip[0]==192 && ip[1]==168) || (ip[0]==172 && ip[1]>=16 && ip[1]<=31));
+    bool validOrigin = (h == httpServer.header("Host") || h == "localhost" || h.endsWith(".local") || isLocalIP);
+
+    if (validOrigin && !org.isEmpty()) {
+        httpServer.sendHeader("Access-Control-Allow-Origin", org);
+        httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        httpServer.sendHeader("Access-Control-Allow-Headers", "X-Requested-With");
+    }
+    httpServer.send(204);
+}
+
 void handleApiData() {
     if (!checkSecurity(false)) return;
     httpServer.send(200, "application/json", buildJsonPayload(true));

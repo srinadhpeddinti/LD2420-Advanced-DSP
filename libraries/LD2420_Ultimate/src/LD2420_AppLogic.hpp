@@ -196,6 +196,12 @@ volatile uint32_t ot2_last_ms = 0;
 #ifndef IRAM_ATTR
 #define IRAM_ATTR
 #endif
+#ifndef IRAM_ATTR
+#define IRAM_ATTR
+#endif
+#ifndef IRAM_ATTR
+#define IRAM_ATTR
+#endif
 void IRAM_ATTR handleOT2() {
   uint32_t now = millis();
   if (now - ot2_last_ms > OT2_DEBOUNCE_MS) {
@@ -563,13 +569,22 @@ inline void blinkLED() {
 //   uptime_s            — system uptime in seconds
 // ─────────────────────────────────────────────────────────────────────────────
 inline void getTelemetryBinary(TelemetryPacket& pkt) {
+    pkt.magic = 0xBEEF;
     pkt.presence = radar.presence_fused ? 1 : 0;
-    pkt.state = radar.presence_state;
-    pkt.activity = radar.activity;
-    pkt.distance_cm = distance_ema_cm;
+    pkt.activity = (uint8_t)radar.activity;
+    pkt.range_cm = radar.range_cm;
     pkt.velocity_cm_s = radar.velocity_cm_s;
     pkt.energy_moving = radar.energy_moving;
     pkt.energy_static = radar.energy_static;
+    pkt.uptime_s = radar.uptime_s;
+
+    // simple checksum
+    uint16_t cs = 0;
+    uint8_t* ptr = (uint8_t*)&pkt;
+    for(size_t i=0; i<sizeof(TelemetryPacket)-2; i++) {
+        cs += ptr[i];
+    }
+    pkt.checksum = cs;
 }
 
 inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {

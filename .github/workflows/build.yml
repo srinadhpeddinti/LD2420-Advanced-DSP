@@ -11,8 +11,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
-      env:
-        ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
     - name: Compile LD2420_Pico_Ultimate.ino
       uses: arduino/compile-sketches@v1
@@ -23,7 +21,7 @@ jobs:
             source-url: "https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json"
         libraries: |
           - name: ArduinoJson
-
+          - name: Arduino_CMSIS-DSP
         cli-compile-flags: |
           - --library
           - ./libraries/LD2420_Ultimate
@@ -40,8 +38,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
-      env:
-        ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     - name: Install Catch2 and Valgrind
       run: sudo apt-get update && sudo apt-get install -y cmake valgrind
     - name: Build Tests
