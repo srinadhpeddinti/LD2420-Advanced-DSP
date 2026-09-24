@@ -83,7 +83,7 @@ const char* MQTT_TOPIC_BASE  = "homeassistant/sensor/ld2420";
 
 // ================================================================================
 
-#include "LD2420_AppLogic.hpp"
+#include <LD2420_AppLogic.hpp>
 
 #include <SoftwareSerial.h>
 SoftwareSerial radarSerial(PIN_RADAR_RX, PIN_RADAR_TX); // RX, TX
@@ -764,6 +764,29 @@ void mqttPublish() {
 // ================================================================================
 // WEB SERVER HANDLERS
 // ================================================================================
+bool validateCSRF() {
+    if (httpServer.header("X-Requested-With") != "XMLHttpRequest") return false;
+    String origin = httpServer.header("Origin");
+    if (origin.length() == 0) return true;
+
+    if (origin.startsWith("http://")) origin = origin.substring(7);
+    else if (origin.startsWith("https://")) origin = origin.substring(8);
+
+    int c = origin.indexOf(':'); if (c != -1) origin = origin.substring(0, c);
+
+    String host = httpServer.header("Host");
+    int hc = host.indexOf(':'); if (hc != -1) host = host.substring(0, hc);
+
+    if (origin == host) return true;
+    if (origin.endsWith(".local")) return true;
+
+    IPAddress ip;
+    if (ip.fromString(origin)) {
+        return (ip[0] == 10 || (ip[0] == 172 && ip[1] >= 16 && ip[1] <= 31) || (ip[0] == 192 && ip[1] == 168) || ip[0] == 127);
+    }
+    return false;
+}
+
 void handleApiData() {
     httpServer.sendHeader("Access-Control-Allow-Origin", "*");
     httpServer.send(200, "application/json", buildJsonPayload(true));
@@ -783,6 +806,10 @@ void handleApiHex() {
 }
 
 void handleApiCmd() {
+    if (!validateCSRF()) {
+        httpServer.send(403, "text/plain", "Forbidden: CSRF validation failed");
+        return;
+    }
     httpServer.sendHeader("Access-Control-Allow-Origin", "*");
     if (!httpServer.hasArg("action")) {
         httpServer.send(400, "text/plain", "Missing action");
@@ -806,6 +833,10 @@ void handleApiCmd() {
 }
 
 void handleApiThresholds() {
+    if (!validateCSRF()) {
+        httpServer.send(403, "text/plain", "Forbidden: CSRF validation failed");
+        return;
+    }
     httpServer.sendHeader("Access-Control-Allow-Origin", "*");
     if (httpServer.hasArg("motion_cm"))    threshold_motion_cm = httpServer.arg("motion_cm").toInt();
     if (httpServer.hasArg("static_cm"))    threshold_static_cm = httpServer.arg("static_cm").toInt();
@@ -880,6 +911,8 @@ void setup() {
     #endif
 
     // HTTP routes
+    const char* headers[] = {"X-Requested-With", "Origin", "Host"};
+    httpServer.collectHeaders(headers, 3);
     httpServer.on("/",                 handleRoot);
     httpServer.on("/api/data",         handleApiData);
     httpServer.on("/api/hex",          handleApiHex);
@@ -887,12 +920,14 @@ void setup() {
     httpServer.on("/api/cmd",          HTTP_OPTIONS, []() {
         httpServer.sendHeader("Access-Control-Allow-Origin", "*");
         httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        httpServer.sendHeader("Access-Control-Allow-Headers", "X-Requested-With");
         httpServer.send(204);
     });
     httpServer.on("/api/thresholds",   HTTP_POST, handleApiThresholds);
     httpServer.on("/api/thresholds",   HTTP_OPTIONS, []() {
         httpServer.sendHeader("Access-Control-Allow-Origin", "*");
         httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        httpServer.sendHeader("Access-Control-Allow-Headers", "X-Requested-With");
         httpServer.send(204);
     });
     httpServer.begin();
