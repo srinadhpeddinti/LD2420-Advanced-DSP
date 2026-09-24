@@ -83,7 +83,7 @@ const char* MQTT_TOPIC_BASE  = "homeassistant/sensor/ld2420";
 
 // ================================================================================
 
-#include "LD2420_AppLogic.hpp"
+#include <LD2420_AppLogic.hpp>
 
 #include <SoftwareSerial.h>
 SoftwareSerial radarSerial(PIN_RADAR_RX, PIN_RADAR_TX); // RX, TX
