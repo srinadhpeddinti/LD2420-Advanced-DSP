@@ -33,7 +33,7 @@
  * =====================================================================================
  */
 
-#include "LD2420_AKF_HMM_NoLimits.hpp"
+#include <LD2420_AKF_HMM_NoLimits.hpp>
 #include <ArduinoJson.h>
 
 // RP2040 Hardware Includes for Raw FMCW ADC Mod
@@ -52,7 +52,7 @@ dma_channel_config dma_cfg;
 // ─────────────────────────────────────────────────────────────────────────────
 
 
-#include "LD2420_AppLogic.hpp"
+#include <LD2420_AppLogic.hpp>
 #include "pico/multicore.h"
 #include "hardware/watchdog.h"
 #include "hardware/clocks.h"
