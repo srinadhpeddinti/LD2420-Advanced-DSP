@@ -83,7 +83,7 @@ const char* MQTT_TOPIC_BASE  = "homeassistant/sensor/ld2420";
 
 // ================================================================================
 
-#include "LD2420_AppLogic.hpp"
+#include <LD2420_AppLogic.hpp>
 
 // WebServer and WebSocket
 WebServer httpServer(80);
