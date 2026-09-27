@@ -21,9 +21,10 @@ jobs:
             source-url: "https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json"
         libraries: |
           - name: ArduinoJson
+          - name: Arduino_CMSIS-DSP
         cli-compile-flags: |
           - --library
-          - ./libraries/LD2420_Ultimate
+          - ${{ github.workspace }}/libraries/LD2420_Ultimate
         sketch-paths: |
           - firmware/LD2420_Pico_Ultimate
 
