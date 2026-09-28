@@ -23,7 +23,7 @@ jobs:
           - name: ArduinoJson
         cli-compile-flags: |
           - --library
-          - ${{ github.workspace }}/libraries/LD2420_Ultimate
+          - ./libraries/LD2420_Ultimate
         sketch-paths: |
           - firmware/LD2420_Pico_Ultimate
 
