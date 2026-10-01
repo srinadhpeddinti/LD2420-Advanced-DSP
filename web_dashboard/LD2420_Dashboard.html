@@ -993,6 +993,10 @@ function apiBase() {
   return 'http://' + espHost;
 }
 function apiFetch(path, options = {}) {
+  if (options.method === 'POST') {
+    options.headers = options.headers || {};
+    options.headers['X-Requested-With'] = 'XMLHttpRequest';
+  }
   return fetch(apiBase() + path, options);
 }
 function sendCmd(action) {
