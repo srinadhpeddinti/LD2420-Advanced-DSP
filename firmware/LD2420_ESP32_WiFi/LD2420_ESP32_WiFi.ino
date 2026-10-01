@@ -764,13 +764,40 @@ void mqttPublish() {
 // ================================================================================
 // WEB SERVER HANDLERS
 // ================================================================================
+
+bool checkCORS() {
+    String origin = httpServer.header("Origin");
+    String host = httpServer.header("Host");
+    if (origin == "" || origin == "null") {
+        if (httpServer.method() == HTTP_POST) {
+            return false;
+        }
+        httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+        return true;
+    }
+    String o = origin;
+    if (o.startsWith("http://")) o = o.substring(7);
+    if (o.startsWith("https://")) o = o.substring(8);
+    int c = o.indexOf(':'); if (c != -1) o = o.substring(0, c);
+    String h = host;
+    c = h.indexOf(':'); if (c != -1) h = h.substring(0, c);
+    bool allowed = (o == h);
+    if (!allowed) {
+        IPAddress ip;
+        if (ip.fromString(o)) {
+            if (ip[0] == 10 || (ip[0] == 192 && ip[1] == 168) || (ip[0] == 172 && ip[1] >= 16 && ip[1] <= 31) || ip == IPAddress(127,0,0,1)) allowed = true;
+        } else if (o == "localhost" || o.endsWith(".local")) allowed = true;
+    }
+    if (allowed) httpServer.sendHeader("Access-Control-Allow-Origin", origin);
+    return allowed;
+}
 void handleApiData() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    if (!checkCORS()) { httpServer.send(403, "text/plain", "Forbidden"); return; }
     httpServer.send(200, "application/json", buildJsonPayload(true));
 }
 
 void handleApiHex() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    if (!checkCORS()) { httpServer.send(403, "text/plain", "Forbidden"); return; }
     String out;
     out.reserve(SNAPSHOT_SIZE + 10);
     uint16_t start = snapIdx;
@@ -783,7 +810,8 @@ void handleApiHex() {
 }
 
 void handleApiCmd() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    if (!checkCORS()) { httpServer.send(403, "text/plain", "Forbidden"); return; }
+    if (httpServer.header("X-Requested-With") != "XMLHttpRequest") { httpServer.send(403, "text/plain", "CSRF"); return; }
     if (!httpServer.hasArg("action")) {
         httpServer.send(400, "text/plain", "Missing action");
         return;
@@ -806,7 +834,8 @@ void handleApiCmd() {
 }
 
 void handleApiThresholds() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    if (!checkCORS()) { httpServer.send(403, "text/plain", "Forbidden"); return; }
+    if (httpServer.header("X-Requested-With") != "XMLHttpRequest") { httpServer.send(403, "text/plain", "CSRF"); return; }
     if (httpServer.hasArg("motion_cm"))    threshold_motion_cm = httpServer.arg("motion_cm").toInt();
     if (httpServer.hasArg("static_cm"))    threshold_static_cm = httpServer.arg("static_cm").toInt();
     if (httpServer.hasArg("sensitivity"))  sensitivity_level   = httpServer.arg("sensitivity").toInt();
@@ -885,16 +914,26 @@ void setup() {
     httpServer.on("/api/hex",          handleApiHex);
     httpServer.on("/api/cmd",          HTTP_POST, handleApiCmd);
     httpServer.on("/api/cmd",          HTTP_OPTIONS, []() {
-        httpServer.sendHeader("Access-Control-Allow-Origin", "*");
-        httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-        httpServer.send(204);
+        if (checkCORS()) {
+            httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+            httpServer.sendHeader("Access-Control-Allow-Headers", "X-Requested-With");
+            httpServer.send(204);
+        } else {
+            httpServer.send(403, "text/plain", "CORS Failed");
+        }
     });
     httpServer.on("/api/thresholds",   HTTP_POST, handleApiThresholds);
     httpServer.on("/api/thresholds",   HTTP_OPTIONS, []() {
-        httpServer.sendHeader("Access-Control-Allow-Origin", "*");
-        httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-        httpServer.send(204);
+        if (checkCORS()) {
+            httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+            httpServer.sendHeader("Access-Control-Allow-Headers", "X-Requested-With");
+            httpServer.send(204);
+        } else {
+            httpServer.send(403, "text/plain", "CORS Failed");
+        }
     });
+    const char* hdrs[] = {"X-Requested-With", "Origin", "Host"};
+    httpServer.collectHeaders(hdrs, 3);
     httpServer.begin();
 
     // WebSocket
