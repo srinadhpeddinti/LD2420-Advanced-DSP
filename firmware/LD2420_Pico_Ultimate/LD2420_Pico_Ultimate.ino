@@ -33,6 +33,16 @@
  * =====================================================================================
  */
 
+// Hardware Pins
+#define PIN_RADAR_RX 1
+#define PIN_RADAR_TX 0
+#define PIN_RADAR_OT2 2
+#ifdef PIN_LED
+#undef PIN_LED
+#endif
+#define PIN_LED 3
+#define RADAR_BAUD 115200
+
 #include "LD2420_AKF_HMM_NoLimits.hpp"
 #include <ArduinoJson.h>
 
@@ -60,6 +70,9 @@ dma_channel_config dma_cfg;
 #define PIN_RADAR_TX 0
 #define PIN_RADAR_RX 1
 #define PIN_RADAR_OT2 2
+#ifdef PIN_LED
+#undef PIN_LED
+#endif
 #define PIN_LED 3
 
 #include "hardware/uart.h"
