@@ -84,7 +84,6 @@ const char* MQTT_TOPIC_BASE  = "homeassistant/sensor/ld2420";
 // ================================================================================
 
 #include "LD2420_AppLogic.hpp"
-using namespace AppLogic;
 
 #include <SoftwareSerial.h>
 SoftwareSerial radarSerial(PIN_RADAR_RX, PIN_RADAR_TX); // RX, TX
@@ -765,50 +764,13 @@ void mqttPublish() {
 // ================================================================================
 // WEB SERVER HANDLERS
 // ================================================================================
-
-// ================================================================================
-// CORS VALIDATION
-// ================================================================================
-bool checkCORS() {
-    String origin = httpServer.header("Origin");
-    String host = httpServer.header("Host");
-
-    if (origin.length() == 0) return true; // allow curl, etc.
-    if (origin == "null" && httpServer.method() == HTTP_GET) return true; // Local dashboard files
-
-    // Remove scheme
-    if (origin.startsWith("http://")) origin = origin.substring(7);
-    if (origin.startsWith("https://")) origin = origin.substring(8);
-
-    // Strip port number if present
-    int colonIdx = origin.indexOf(':');
-    if (colonIdx != -1) {
-        origin = origin.substring(0, colonIdx);
-    }
-
-    if (origin == host) return true;
-    if (origin == "ld2420.local") return true;
-
-    IPAddress ip;
-    if (ip.fromString(origin)) {
-        if (ip[0] == 10 || (ip[0] == 172 && ip[1] >= 16 && ip[1] <= 31) || (ip[0] == 192 && ip[1] == 168)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 void handleApiData() {
-    if (!checkCORS()) { httpServer.send(403, "text/plain", "Forbidden"); return; }
-    String origin = httpServer.header("Origin");
-    httpServer.sendHeader("Access-Control-Allow-Origin", origin.length() ? origin : "*");
+    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
     httpServer.send(200, "application/json", buildJsonPayload(true));
 }
 
 void handleApiHex() {
-    if (!checkCORS()) { httpServer.send(403, "text/plain", "Forbidden"); return; }
-    String origin = httpServer.header("Origin");
-    httpServer.sendHeader("Access-Control-Allow-Origin", origin.length() ? origin : "*");
+    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
     String out;
     out.reserve(SNAPSHOT_SIZE + 10);
     uint16_t start = snapIdx;
@@ -821,12 +783,7 @@ void handleApiHex() {
 }
 
 void handleApiCmd() {
-    if (!checkCORS() || httpServer.header("X-Requested-With") != "XMLHttpRequest") {
-        httpServer.send(403, "text/plain", "Forbidden");
-        return;
-    }
-    String origin = httpServer.header("Origin");
-    if (origin.length()) httpServer.sendHeader("Access-Control-Allow-Origin", origin);
+    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
     if (!httpServer.hasArg("action")) {
         httpServer.send(400, "text/plain", "Missing action");
         return;
@@ -849,12 +806,7 @@ void handleApiCmd() {
 }
 
 void handleApiThresholds() {
-    if (!checkCORS() || httpServer.header("X-Requested-With") != "XMLHttpRequest") {
-        httpServer.send(403, "text/plain", "Forbidden");
-        return;
-    }
-    String origin = httpServer.header("Origin");
-    if (origin.length()) httpServer.sendHeader("Access-Control-Allow-Origin", origin);
+    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
     if (httpServer.hasArg("motion_cm"))    threshold_motion_cm = httpServer.arg("motion_cm").toInt();
     if (httpServer.hasArg("static_cm"))    threshold_static_cm = httpServer.arg("static_cm").toInt();
     if (httpServer.hasArg("sensitivity"))  sensitivity_level   = httpServer.arg("sensitivity").toInt();
@@ -928,27 +880,19 @@ void setup() {
     #endif
 
     // HTTP routes
-    const char* headerkeys[] = {"Host", "Origin", "X-Requested-With"};
-    httpServer.collectHeaders(headerkeys, (size_t)3);
     httpServer.on("/",                 handleRoot);
     httpServer.on("/api/data",         handleApiData);
     httpServer.on("/api/hex",          handleApiHex);
     httpServer.on("/api/cmd",          HTTP_POST, handleApiCmd);
     httpServer.on("/api/cmd",          HTTP_OPTIONS, []() {
-        if (!checkCORS()) { httpServer.send(403, "text/plain", "Forbidden"); return; }
-        String origin = httpServer.header("Origin");
-        if (origin.length()) httpServer.sendHeader("Access-Control-Allow-Origin", origin);
+        httpServer.sendHeader("Access-Control-Allow-Origin", "*");
         httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-        httpServer.sendHeader("Access-Control-Allow-Headers", "X-Requested-With");
         httpServer.send(204);
     });
     httpServer.on("/api/thresholds",   HTTP_POST, handleApiThresholds);
     httpServer.on("/api/thresholds",   HTTP_OPTIONS, []() {
-        if (!checkCORS()) { httpServer.send(403, "text/plain", "Forbidden"); return; }
-        String origin = httpServer.header("Origin");
-        if (origin.length()) httpServer.sendHeader("Access-Control-Allow-Origin", origin);
+        httpServer.sendHeader("Access-Control-Allow-Origin", "*");
         httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-        httpServer.sendHeader("Access-Control-Allow-Headers", "X-Requested-With");
         httpServer.send(204);
     });
     httpServer.begin();
