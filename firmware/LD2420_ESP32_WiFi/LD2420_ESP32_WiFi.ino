@@ -765,9 +765,6 @@ void mqttPublish() {
 // WEB SERVER HANDLERS
 // ================================================================================
 bool validateCORS(bool isGet) {
-    String host = httpServer.header("Host");
-    String origin = httpServer.header("Origin");
-
     if (!isGet) {
         if (!httpServer.hasHeader("X-Requested-With") || httpServer.header("X-Requested-With") != "XMLHttpRequest") {
             httpServer.send(403, "text/plain", "Forbidden: Missing or invalid X-Requested-With");
@@ -775,49 +772,8 @@ bool validateCORS(bool isGet) {
         }
     }
 
-    if (origin.isEmpty() || origin == "null") {
-        if (!isGet) {
-            httpServer.send(403, "text/plain", "Forbidden: Null origin only allowed for GET");
-            return false;
-        }
-        httpServer.sendHeader("Access-Control-Allow-Origin", "null");
-        return true;
-    }
-
-    if (origin.startsWith("http://")) origin.remove(0, 7);
-    if (origin.startsWith("https://")) origin.remove(0, 8);
-
-    int colonIndex = origin.indexOf(':');
-    if (colonIndex != -1) {
-        origin = origin.substring(0, colonIndex);
-    }
-
-    int hostColonIndex = host.indexOf(':');
-    if (hostColonIndex != -1) {
-        host = host.substring(0, hostColonIndex);
-    }
-
-    bool allowed = false;
-    if (origin.equalsIgnoreCase(host)) {
-        allowed = true;
-    } else if (origin.endsWith(".local")) {
-        allowed = true;
-    } else {
-        IPAddress ip;
-        if (ip.fromString(origin)) {
-            if (ip[0] == 10 || (ip[0] == 172 && ip[1] >= 16 && ip[1] <= 31) || (ip[0] == 192 && ip[1] == 168) || (ip[0] == 127)) {
-                allowed = true;
-            }
-        }
-    }
-
-    if (allowed) {
-        httpServer.sendHeader("Access-Control-Allow-Origin", httpServer.header("Origin"));
-        return true;
-    }
-
-    httpServer.send(403, "text/plain", "Forbidden: Invalid Origin");
-    return false;
+    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    return true;
 }
 
 void handleApiData() {
