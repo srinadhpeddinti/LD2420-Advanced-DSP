@@ -1171,10 +1171,30 @@ function renderZoneMap(zones, activeZone) {
       const row = document.createElement('div');
       row.className = 'zone-row';
       row.id = 'zr-' + z;
-      row.innerHTML =
-        `<div class="zone-lbl" id="zl-${z}">Z${z+1} ${z*100}–${(z+1)*100}</div>
-         <div class="zone-track"><div class="zone-fill" id="zf-${z}" style="width:0%"></div></div>
-         <div class="zone-pct" id="zp-${z}">0%</div>`;
+
+      const lbl = document.createElement('div');
+      lbl.className = 'zone-lbl';
+      lbl.id = 'zl-' + z;
+      lbl.textContent = 'Z' + (z + 1) + ' ' + (z * 100) + '–' + ((z + 1) * 100);
+
+      const track = document.createElement('div');
+      track.className = 'zone-track';
+
+      const fill = document.createElement('div');
+      fill.className = 'zone-fill';
+      fill.id = 'zf-' + z;
+      fill.style.width = '0%';
+      track.appendChild(fill);
+
+      const pct = document.createElement('div');
+      pct.className = 'zone-pct';
+      pct.id = 'zp-' + z;
+      pct.textContent = '0%';
+
+      row.appendChild(lbl);
+      row.appendChild(track);
+      row.appendChild(pct);
+
       wrap.appendChild(row);
     }
   }
