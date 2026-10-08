@@ -6,3 +6,7 @@
 **Vulnerability:** Found `innerHTML` being used with template literals to construct HTML elements dynamically based on integer inputs (zones). Even though the input might currently be safe, this is a known anti-pattern for DOM manipulation which could lead to DOM-based XSS if the data source becomes tainted.
 **Learning:** In a static HTML frontend that serves as a dashboard for an embedded device, relying on `innerHTML` for dynamic content generation is risky. It's crucial to use safe DOM APIs consistently.
 **Prevention:** Avoid `innerHTML` entirely for dynamically generated content. Always use `document.createElement()`, `textContent`, and `appendChild()` to ensure data is treated strictly as text/nodes and never executed as markup.
+## 2024-05-24 - [CI Compilation Failure Fix]
+**Vulnerability:** CI workflow was failing because the relative path `./libraries/LD2420_Ultimate` in the `arduino/compile-sketches` action failed to resolve the local library, causing compilation to abort.
+**Learning:** For the `arduino/compile-sketches` GitHub action, local libraries must be specified using an absolute path (like `${{ github.workspace }}/libraries/LibraryName`) for correct resolution, rather than a relative path, due to the execution context of the action runner. This aligns with existing memory about GitHub action behavior for local libraries.
+**Prevention:** Always use absolute workspace paths for `--library` arguments in CI configurations to ensure consistent resolution.
