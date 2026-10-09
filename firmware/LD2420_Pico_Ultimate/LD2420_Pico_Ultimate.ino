@@ -52,16 +52,17 @@ dma_channel_config dma_cfg;
 // ─────────────────────────────────────────────────────────────────────────────
 
 
-#include "LD2420_AppLogic.hpp"
 #include "pico/multicore.h"
 #include "hardware/watchdog.h"
 #include "hardware/clocks.h"
 
+#undef PIN_LED
 #define PIN_RADAR_TX 0
 #define PIN_RADAR_RX 1
 #define PIN_RADAR_OT2 2
 #define PIN_LED 3
 
+#include "LD2420_AppLogic.hpp"
 #include "hardware/uart.h"
 
 int uart_dma_chan;

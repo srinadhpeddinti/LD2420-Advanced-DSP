@@ -102,7 +102,7 @@ uint32_t last_mqtt_ms = 0;
 #define MQTT_INTERVAL_MS 1000 
 
 void sendWebSocketUpdate() {
-    StaticJsonDocument<1024> doc;
+    JsonDocument doc;
     AppLogic::getTelemetryJson(doc);
     String output;
     serializeJson(doc, output);
@@ -112,7 +112,7 @@ void sendWebSocketUpdate() {
 void mqttPublish() {
 #if ENABLE_MQTT
     if(!mqttClient.connected()) return;
-    StaticJsonDocument<1024> doc;
+    JsonDocument doc;
     AppLogic::getTelemetryJson(doc);
     String output;
     serializeJson(doc, output);
