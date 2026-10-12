@@ -5,6 +5,10 @@
 
 #include <LittleFS.h>
 
+#ifndef IRAM_ATTR
+#define IRAM_ATTR
+#endif
+
 #pragma pack(push, 1)
 struct TelemetryPacket {
     uint16_t magic; // 0xBEEF
@@ -559,9 +563,8 @@ inline void blinkLED() {
 //   outliers            — Mahalanobis-rejected range spikes
 //   uptime_s            — system uptime in seconds
 // ─────────────────────────────────────────────────────────────────────────────
-inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
-  // 1024 bytes is enough for this schema (~600 bytes serialized)
-  
+inline void getTelemetryJson(JsonDocument& doc) {
+  // Use dynamically sized JsonDocument for v7 compatibility
 
   uint32_t now = millis();
   radar.uptime_s = now / 1000;
@@ -575,7 +578,7 @@ inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
   // ── Activity ─────────────────────────────────────────────────────────────
   doc["activity"] = UltimateDSP::hmmStateName(radar.activity);
 
-  JsonArray aprobs = doc.createNestedArray("activity_probs");
+  JsonArray aprobs = doc["activity_probs"].to<JsonArray>();
   for (int i = 0; i < UltimateDSP::HMM_STATES; i++)
     aprobs.add(serialized(String(radar.activity_probs[i], 3)));
 
@@ -612,9 +615,9 @@ inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
   doc["fall_time_ms"] = radar.fall_time_ms;
 
   // ── Occupancy Grid ───────────────────────────────────────────────────────
-  JsonArray zones = doc.createNestedArray("zones");
+  JsonArray zones = doc["zones"].to<JsonArray>();
   for (int z = 0; z < UltimateDSP::OccupancyGridEngine::ZONES; z++) {
-    JsonObject zobj = zones.createNestedObject();
+    JsonObject zobj = zones.add<JsonObject>();
     zobj["z"] = z;
     zobj["m_lo"] = z * 100;
     zobj["m_hi"] = (z + 1) * 100;
