@@ -19,9 +19,8 @@
 
 #pragma once
 #include <math.h>
-#if defined(ARDUINO_ARCH_RP2040) || defined(ARDUINO_ARCH_STM32)
-#include <arm_math.h>
-#endif
+// Memory: When building for RP2040 or STM32 architectures (e.g., in arduino/compile-sketches GitHub actions), ensure hardware-specific CMSIS headers like <arm_math.h> are not unnecessarily included if their functions are not used. Doing so can cause fatal 'No such file or directory' compilation errors if the DSP libraries are not explicitly linked.
+// Removed arm_math.h inclusion to fix GitHub action compile failure
 #include <stdint.h>
 #include <string.h>
 
