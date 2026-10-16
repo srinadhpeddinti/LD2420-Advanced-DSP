@@ -33,6 +33,13 @@
  * =====================================================================================
  */
 
+#define PIN_RADAR_TX 0
+#define PIN_RADAR_RX 1
+#define PIN_RADAR_OT2 2
+#ifndef PIN_LED
+#define PIN_LED 3
+#endif
+
 #include "LD2420_AKF_HMM_NoLimits.hpp"
 #include <ArduinoJson.h>
 
@@ -57,10 +64,6 @@ dma_channel_config dma_cfg;
 #include "hardware/watchdog.h"
 #include "hardware/clocks.h"
 
-#define PIN_RADAR_TX 0
-#define PIN_RADAR_RX 1
-#define PIN_RADAR_OT2 2
-#define PIN_LED 3
 
 #include "hardware/uart.h"
 
@@ -180,6 +183,7 @@ void loop() {
         sum_sq += centered * centered;
     }
     double rms_if = sqrt((double)sum_sq / ADC_SAMPLES);
+    (void)rms_if;
     dma_channel_configure(dma_chan, &dma_cfg, adc_buffer, &adc_hw->fifo, ADC_SAMPLES, true);
     adc_run(true);
   }
