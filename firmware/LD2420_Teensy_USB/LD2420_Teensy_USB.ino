@@ -122,7 +122,7 @@ void loop() {
         AppLogic::radar.voice_prime = false;
     }
 
-    StaticJsonDocument<1024> doc;
+    JsonDocument doc;
     AppLogic::getTelemetryJson(doc);
     serializeJson(doc, Serial);
     Serial.println();

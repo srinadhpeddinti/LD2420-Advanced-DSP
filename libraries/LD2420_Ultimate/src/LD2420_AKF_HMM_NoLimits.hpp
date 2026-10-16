@@ -1215,6 +1215,7 @@ class DecisionTreeClassifier {
 public:
     // Simple Embedded CART tree representation
     bool isPet(double height_estimate_cm, double avg_velocity, double target_rcs) {
+        (void)height_estimate_cm;
         if(target_rcs < 30.0) {
             if(avg_velocity > 100.0) return true; // Fast small object -> Dog/Cat
             else return false; // Slow small object -> Clutter/Fan
@@ -1336,6 +1337,7 @@ public:
     // float input_tensor[128]; // Raw velocity buffer (12.8s at 10Hz)
     
     bool predictFall(double current_velocity) {
+        (void)current_velocity;
         // This is a stub for the future `tflite::MicroInterpreter` integration.
         // Currently returns false.
         return false;
