@@ -102,7 +102,7 @@ uint32_t last_mqtt_ms = 0;
 #define MQTT_INTERVAL_MS 1000 // 1Hz for MQTT to not spam broker
 
 void sendWebSocketUpdate() {
-    StaticJsonDocument<1024> doc;
+    JsonDocument doc;
     AppLogic::getTelemetryJson(doc);
     String output;
     serializeJson(doc, output);
@@ -112,7 +112,7 @@ void sendWebSocketUpdate() {
 void mqttPublish() {
 #if ENABLE_MQTT
     if(!mqttClient.connected()) return;
-    StaticJsonDocument<1024> doc;
+    JsonDocument doc;
     AppLogic::getTelemetryJson(doc);
     String output;
     serializeJson(doc, output);
@@ -606,7 +606,7 @@ void updateSession(bool present) {
 // ================================================================================
 String buildJsonPayload(bool full) {
     // If not full, we use a much smaller document (768 bytes) to avoid heap fragmentation and pressure
-    DynamicJsonDocument doc(full ? 1536 : 768);
+    JsonDocument doc;
 
     // Core state
     doc["presence"]           = (radar.presence_serial || radar.presence_hardware);
@@ -631,7 +631,7 @@ String buildJsonPayload(bool full) {
     
     // Probabilistic Metrics (HMM + AKF)
     doc["kalman_innov"]       = radar.kalman_innov;
-    JsonArray hmm = doc.createNestedArray("markov");
+    JsonArray hmm = doc["markov"].to<JsonArray>();
     for (int i = 0; i < 6; i++) {
         hmm.add(radar.markov_probs[i]);
     }
@@ -654,9 +654,9 @@ String buildJsonPayload(bool full) {
     doc["stability"]          = radar.stability_score;
 
     // Zone map (trimmed: from_cm/to_cm calculable client-side as z*100)
-    JsonArray zones = doc.createNestedArray("zones");
+    JsonArray zones = doc["zones"].to<JsonArray>();
     for (int z = 0; z < 8; z++) {
-        JsonObject zobj = zones.createNestedObject();
+        JsonObject zobj = zones.add<JsonObject>();
         zobj["z"]        = z;
         zobj["motion"]   = radar.zones[z].motion_intensity;
         zobj["static_e"] = radar.zones[z].static_intensity;
@@ -673,7 +673,7 @@ String buildJsonPayload(bool full) {
         doc["total_occupancy_s"]  = radar.total_occupancy_ms / 1000;
 
         // Hourly array
-        JsonArray hourly = doc.createNestedArray("hourly");
+        JsonArray hourly = doc["hourly"].to<JsonArray>();
         for (int h = 0; h < HISTORY_BINS; h++) {
             hourly.add(radar.hourly_occupancy[h]);
         }
