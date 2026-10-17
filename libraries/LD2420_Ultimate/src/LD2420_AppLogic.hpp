@@ -5,6 +5,34 @@
 
 #include <LittleFS.h>
 
+
+
+#define TELEMETRY_HZ 10
+#define TELEMETRY_MS (1000 / TELEMETRY_HZ)
+#define BREATHING_ANALYZE_MS 2000
+#define DOPPLER_ANALYZE_MS 1000
+#define FALL_ALERT_HOLD_MS 5000
+#define OT2_DEBOUNCE_MS 50
+#define RANGE_SANITY_MAX_CM 800
+#define RANGE_SANITY_MIN_CM 5
+#define VELOCITY_OUTLIER_M_DIST 4.0
+#define PRESENCE_TIMEOUT_MS 5000
+#define STATIC_DETECT_VEL_CM 15
+#define LED_BLINK_MS 100
+
+#if defined(ARDUINO_ARCH_RP2040)
+#include "pico/mutex.h"
+extern mutex_t radar_mutex;
+#define LOCK_RADAR()   mutex_enter_blocking(&radar_mutex)
+#define UNLOCK_RADAR() mutex_exit(&radar_mutex)
+#define VOLATILE_SHARED volatile
+#else
+#define LOCK_RADAR()
+#define UNLOCK_RADAR()
+#define VOLATILE_SHARED
+#endif
+
+namespace AppLogic {
 #pragma pack(push, 1)
 struct TelemetryPacket {
     uint16_t magic; // 0xBEEF
@@ -66,33 +94,6 @@ inline void logActivityTransition(UltimateDSP::HMMState old_state, UltimateDSP::
     }
 }
 
-
-#define TELEMETRY_HZ 10 
-#define TELEMETRY_MS (1000 / TELEMETRY_HZ)
-#define BREATHING_ANALYZE_MS 2000   
-#define DOPPLER_ANALYZE_MS 1000     
-#define FALL_ALERT_HOLD_MS 5000     
-#define OT2_DEBOUNCE_MS 50          
-#define RANGE_SANITY_MAX_CM 800     
-#define RANGE_SANITY_MIN_CM 5       
-#define VELOCITY_OUTLIER_M_DIST 4.0 
-#define PRESENCE_TIMEOUT_MS 5000    
-#define STATIC_DETECT_VEL_CM 15     
-#define LED_BLINK_MS 100            
-
-#if defined(ARDUINO_ARCH_RP2040)
-#include "pico/mutex.h"
-extern mutex_t radar_mutex;
-#define LOCK_RADAR()   mutex_enter_blocking(&radar_mutex)
-#define UNLOCK_RADAR() mutex_exit(&radar_mutex)
-#define VOLATILE_SHARED volatile
-#else
-#define LOCK_RADAR()
-#define UNLOCK_RADAR()
-#define VOLATILE_SHARED
-#endif
-
-namespace AppLogic {
 
 UltimateDSP::AdaptiveKalmanFilter kalman(0.0);
 UltimateDSP::MarkovActivityEngine markov;
@@ -188,6 +189,10 @@ uint32_t last_serial_range_ms = 0; // track last Range message timestamp
 uint32_t led_off_ms = 0;
 
 // ─────────────────────────────────────────────────────────────────────────────
+#ifndef IRAM_ATTR
+#define IRAM_ATTR
+#endif
+
 // OT2 INTERRUPT HANDLER (Hardware Doppler pin)
 // ─────────────────────────────────────────────────────────────────────────────
 volatile bool ot2_raw = false;
@@ -385,6 +390,7 @@ inline void runActivityClassification() {
   double accel = radar.accel_cm_s2;
   double innov = radar.kalman_innovation;
   uint32_t state_dur_s = (millis() - radar.state_start_ms) / 1000;
+  (void)state_dur_s;
 
   // Feed HMM forward algorithm
   if (present) {
@@ -559,7 +565,7 @@ inline void blinkLED() {
 //   outliers            — Mahalanobis-rejected range spikes
 //   uptime_s            — system uptime in seconds
 // ─────────────────────────────────────────────────────────────────────────────
-inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
+inline void getTelemetryJson(JsonDocument& doc) {
   // 1024 bytes is enough for this schema (~600 bytes serialized)
   
 
@@ -575,7 +581,7 @@ inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
   // ── Activity ─────────────────────────────────────────────────────────────
   doc["activity"] = UltimateDSP::hmmStateName(radar.activity);
 
-  JsonArray aprobs = doc.createNestedArray("activity_probs");
+  JsonArray aprobs = doc["activity_probs"].to<JsonArray>();
   for (int i = 0; i < UltimateDSP::HMM_STATES; i++)
     aprobs.add(serialized(String(radar.activity_probs[i], 3)));
 
@@ -612,9 +618,9 @@ inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
   doc["fall_time_ms"] = radar.fall_time_ms;
 
   // ── Occupancy Grid ───────────────────────────────────────────────────────
-  JsonArray zones = doc.createNestedArray("zones");
+  JsonArray zones = doc["zones"].to<JsonArray>();
   for (int z = 0; z < UltimateDSP::OccupancyGridEngine::ZONES; z++) {
-    JsonObject zobj = zones.createNestedObject();
+    JsonObject zobj = zones.add<JsonObject>();
     zobj["z"] = z;
     zobj["m_lo"] = z * 100;
     zobj["m_hi"] = (z + 1) * 100;
