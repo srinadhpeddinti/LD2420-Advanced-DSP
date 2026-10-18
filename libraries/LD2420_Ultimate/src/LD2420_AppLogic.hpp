@@ -559,7 +559,7 @@ inline void blinkLED() {
 //   outliers            — Mahalanobis-rejected range spikes
 //   uptime_s            — system uptime in seconds
 // ─────────────────────────────────────────────────────────────────────────────
-inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
+inline void getTelemetryJson(JsonDocument& doc) {
   // 1024 bytes is enough for this schema (~600 bytes serialized)
   
 
@@ -575,7 +575,7 @@ inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
   // ── Activity ─────────────────────────────────────────────────────────────
   doc["activity"] = UltimateDSP::hmmStateName(radar.activity);
 
-  JsonArray aprobs = doc.createNestedArray("activity_probs");
+  JsonArray aprobs = doc["activity_probs"].to<JsonArray>();
   for (int i = 0; i < UltimateDSP::HMM_STATES; i++)
     aprobs.add(serialized(String(radar.activity_probs[i], 3)));
 
@@ -612,9 +612,9 @@ inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
   doc["fall_time_ms"] = radar.fall_time_ms;
 
   // ── Occupancy Grid ───────────────────────────────────────────────────────
-  JsonArray zones = doc.createNestedArray("zones");
+  JsonArray zones = doc["zones"].to<JsonArray>();
   for (int z = 0; z < UltimateDSP::OccupancyGridEngine::ZONES; z++) {
-    JsonObject zobj = zones.createNestedObject();
+    JsonObject zobj = zones.add<JsonObject>();
     zobj["z"] = z;
     zobj["m_lo"] = z * 100;
     zobj["m_hi"] = (z + 1) * 100;
