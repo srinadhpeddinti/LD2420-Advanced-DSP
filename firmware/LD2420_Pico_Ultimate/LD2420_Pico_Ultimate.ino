@@ -33,7 +33,6 @@
  * =====================================================================================
  */
 
-#include "LD2420_AKF_HMM_NoLimits.hpp"
 #include <ArduinoJson.h>
 
 // RP2040 Hardware Includes for Raw FMCW ADC Mod
@@ -51,8 +50,6 @@ dma_channel_config dma_cfg;
 // COMPILE-TIME CONFIGURATION
 // ─────────────────────────────────────────────────────────────────────────────
 
-
-#include "LD2420_AppLogic.hpp"
 #include "pico/multicore.h"
 #include "hardware/watchdog.h"
 #include "hardware/clocks.h"
@@ -60,7 +57,13 @@ dma_channel_config dma_cfg;
 #define PIN_RADAR_TX 0
 #define PIN_RADAR_RX 1
 #define PIN_RADAR_OT2 2
+
+#ifndef PIN_LED
 #define PIN_LED 3
+#endif
+
+#include "LD2420_AKF_HMM_NoLimits.hpp"
+#include "LD2420_AppLogic.hpp"
 
 #include "hardware/uart.h"
 
@@ -70,7 +73,11 @@ uint32_t uart_read_ptr = 0;
 
 mutex_t radar_mutex;
 
-void handleOT2() {
+#ifndef IRAM_ATTR
+#define IRAM_ATTR
+#endif
+
+void IRAM_ATTR handleOT2() {
   uint32_t now = millis();
   if (now - AppLogic::ot2_last_ms > OT2_DEBOUNCE_MS) {
     AppLogic::ot2_raw = (digitalRead(PIN_RADAR_OT2) == HIGH);
@@ -93,12 +100,12 @@ void loop1() {
     if (millis() - AppLogic::last_broadcast_ms >= TELEMETRY_MS) {
         AppLogic::last_broadcast_ms = millis();
         
-        AppLogic::TelemetryPacket pkt;
+        TelemetryPacket pkt;
         LOCK_RADAR();
-        AppLogic::getTelemetryBinary(pkt);
+        getTelemetryBinary(pkt);
         UNLOCK_RADAR();
         
-        Serial.write((const uint8_t*)&pkt, sizeof(AppLogic::TelemetryPacket));
+        Serial.write((const uint8_t*)&pkt, sizeof(TelemetryPacket));
         Serial.flush();
         AppLogic::blinkLED();
     }

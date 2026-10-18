@@ -10,3 +10,7 @@
 **Vulnerability:** Not a direct vulnerability, but an operational issue causing pipeline breakage. Unnecessarily including hardware-specific CMSIS headers like `arm_math.h` when their functions are not used causes fatal "No such file or directory" compilation errors in CI environments that don't have the DSP libraries explicitly linked or present.
 **Learning:** Only include headers that are actually used by the code. Extraneous architecture-specific headers create brittle builds.
 **Prevention:** Verify that included libraries are actually utilized. Remove unused `#include <arm_math.h>`.
+## 2024-05-18 - Deprecated ArduinoJson methods and namespace issues
+**Vulnerability:** Not a direct vulnerability, but compilation errors caused by deprecated library methods (`createNestedArray`, `createNestedObject`, `StaticJsonDocument`) and missing namespace qualifiers (like `AppLogic::`) for structures.
+**Learning:** Libraries evolve, and relying on deprecated methods or not properly scoping structures within namespaces can lead to broken builds, especially when dependencies are updated in CI.
+**Prevention:** Keep code updated with library changes (e.g., migrating to ArduinoJson v7 syntax) and ensure proper namespace scope is used when accessing structures defined within them.
