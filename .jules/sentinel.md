@@ -10,3 +10,11 @@
 **Vulnerability:** Fatal compilation error when building for RP2040 or STM32 due to unnecessary inclusion of `<arm_math.h>` without linking the appropriate DSP libraries in the GitHub Actions runner.
 **Learning:** Unused headers, especially hardware-specific ones like CMSIS, should not be included if their functions aren't being invoked. Leaving them in can cause CI pipelines to fail if the action environment lacks those exact pre-compiled libraries or include paths.
 **Prevention:** Verify and remove unused headers to maintain cross-platform build stability, especially when compiling C++ for different embedded architectures.
+## 2024-05-18 - Hardware macros missing before library headers in .ino files
+**Vulnerability:** Fatal compilation errors ( or macro redefinitions) in Arduino sketches when hardware pin macros (e.g., ) are defined after the inclusion of library headers that rely on them.
+**Learning:** In projects like LD2420, libraries often depend on macros defined in the main  file. Including headers like  before the macros are defined causes the library to compile without knowing the hardware pins, leading to fatal scope errors.
+**Prevention:** Always define necessary hardware macros before including custom project headers in the main sketch. Wrap them in  guards to prevent redefinition warnings from core packages.
+## 2024-05-18 - Hardware macros missing before library headers in .ino files
+**Vulnerability:** Fatal compilation errors ('not declared in this scope' or macro redefinitions) in Arduino sketches when hardware pin macros (e.g., '#define PIN_LED') are defined after the inclusion of library headers that rely on them.
+**Learning:** In projects like LD2420, libraries often depend on macros defined in the main '.ino' file. Including headers like 'LD2420_AppLogic.hpp' before the macros are defined causes the library to compile without knowing the hardware pins, leading to fatal scope errors.
+**Prevention:** Always define necessary hardware macros before including custom project headers in the main sketch. Wrap them in '#ifndef' guards to prevent redefinition warnings from core packages.
