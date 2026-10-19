@@ -6,3 +6,7 @@
 **Vulnerability:** DOM-based XSS potential in static HTML frontend file (`web_dashboard/LD2420_Dashboard.html`) due to usage of `innerHTML` with dynamic template strings.
 **Learning:** Even if data is controlled locally or comes from a trusted serial connection, using `innerHTML` to construct DOM nodes creates unnecessary security risks and fails standard SAST checks. Using programmatic DOM creation methods is safer.
 **Prevention:** Avoid using `innerHTML` for dynamic UI generation. Prefer safe DOM API methods like `document.createElement`, `.className`, `.id`, `.textContent`, and `.appendChild` to construct UI elements programmatically.
+## 2024-05-18 - Missing CMSIS headers when using arduino-cli
+**Vulnerability:** Fatal compilation error when building for RP2040 or STM32 due to unnecessary inclusion of `<arm_math.h>` without linking the appropriate DSP libraries in the GitHub Actions runner.
+**Learning:** Unused headers, especially hardware-specific ones like CMSIS, should not be included if their functions aren't being invoked. Leaving them in can cause CI pipelines to fail if the action environment lacks those exact pre-compiled libraries or include paths.
+**Prevention:** Verify and remove unused headers to maintain cross-platform build stability, especially when compiling C++ for different embedded architectures.
