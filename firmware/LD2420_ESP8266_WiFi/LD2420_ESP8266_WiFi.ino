@@ -882,7 +882,8 @@ bool handleCORS() {
 
         // Strict DNS Rebinding protection: Only allow Origin matching Host if Host is the actual local IP
         if (!allowed && origin.endsWith(host)) {
-            if (host.startsWith(WiFi.localIP().toString())) {
+            String ipStrLocal = WiFi.localIP().toString();
+            if (host == ipStrLocal || host.startsWith(ipStrLocal + ":")) {
                 allowed = true;
             }
         }

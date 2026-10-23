@@ -33,6 +33,17 @@
  * =====================================================================================
  */
 
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPILE-TIME CONFIGURATION
+// ─────────────────────────────────────────────────────────────────────────────
+#define PIN_RADAR_TX 0
+#define PIN_RADAR_RX 1
+#define PIN_RADAR_OT2 2
+
+#ifndef PIN_LED
+#define PIN_LED 3
+#endif
+
 #include "LD2420_AKF_HMM_NoLimits.hpp"
 #include <ArduinoJson.h>
 
@@ -47,20 +58,11 @@ uint16_t adc_buffer[ADC_SAMPLES];
 int dma_chan;
 dma_channel_config dma_cfg;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// COMPILE-TIME CONFIGURATION
-// ─────────────────────────────────────────────────────────────────────────────
-
 
 #include "LD2420_AppLogic.hpp"
 #include "pico/multicore.h"
 #include "hardware/watchdog.h"
 #include "hardware/clocks.h"
-
-#define PIN_RADAR_TX 0
-#define PIN_RADAR_RX 1
-#define PIN_RADAR_OT2 2
-#define PIN_LED 3
 
 #include "hardware/uart.h"
 
@@ -95,7 +97,7 @@ void loop1() {
         
         AppLogic::TelemetryPacket pkt;
         LOCK_RADAR();
-        AppLogic::getTelemetryBinary(pkt);
+        getTelemetryBinary(pkt);
         UNLOCK_RADAR();
         
         Serial.write((const uint8_t*)&pkt, sizeof(AppLogic::TelemetryPacket));
@@ -180,6 +182,7 @@ void loop() {
         sum_sq += centered * centered;
     }
     double rms_if = sqrt((double)sum_sq / ADC_SAMPLES);
+    (void)rms_if; // Unused depending on the branch below
     dma_channel_configure(dma_chan, &dma_cfg, adc_buffer, &adc_hw->fifo, ADC_SAMPLES, true);
     adc_run(true);
   }
