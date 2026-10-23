@@ -765,12 +765,12 @@ void mqttPublish() {
 // WEB SERVER HANDLERS
 // ================================================================================
 void handleApiData() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    if (!handleCORS()) return;
     httpServer.send(200, "application/json", buildJsonPayload(true));
 }
 
 void handleApiHex() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    if (!handleCORS()) return;
     String out;
     out.reserve(SNAPSHOT_SIZE + 10);
     uint16_t start = snapIdx;
@@ -783,7 +783,7 @@ void handleApiHex() {
 }
 
 void handleApiCmd() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    if (!handleCORS()) return;
     if (!httpServer.hasArg("action")) {
         httpServer.send(400, "text/plain", "Missing action");
         return;
@@ -806,7 +806,7 @@ void handleApiCmd() {
 }
 
 void handleApiThresholds() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    if (!handleCORS()) return;
     if (httpServer.hasArg("motion_cm"))    threshold_motion_cm = httpServer.arg("motion_cm").toInt();
     if (httpServer.hasArg("static_cm"))    threshold_static_cm = httpServer.arg("static_cm").toInt();
     if (httpServer.hasArg("sensitivity"))  sensitivity_level   = httpServer.arg("sensitivity").toInt();
@@ -833,6 +833,69 @@ void handleRoot() {
     // === BEGIN EMBEDDED HTML ===
     // (See companion LD2420_Dashboard.html — serves full premium UI)
     // === END EMBEDDED HTML ===
+}
+
+// ================================================================================
+// CORS AND CSRF SECURITY VALIDATION
+// ================================================================================
+bool handleCORS() {
+    String origin = httpServer.header("Origin");
+    String host = httpServer.header("Host");
+
+    // CSRF Protection for POST requests
+    if (httpServer.method() == HTTP_POST) {
+        if (!httpServer.hasHeader("X-Requested-With") ||
+            httpServer.header("X-Requested-With") != "XMLHttpRequest") {
+            httpServer.send(403, "text/plain", "Forbidden: Missing X-Requested-With");
+            return false;
+        }
+    }
+
+    // No Origin header is fine (e.g. direct server-to-server requests)
+    if (!httpServer.hasHeader("Origin") || origin.length() == 0) {
+        return true;
+    }
+
+    bool allowed = false;
+
+    // Allow local mDNS resolution
+    if (origin.endsWith(".local")) allowed = true;
+    // Local dashboard loaded as file
+    else if ((origin == "null" || origin == "file://") && httpServer.method() == HTTP_GET) allowed = true;
+    else {
+        // Allow private IP addresses (parsed correctly to avoid string prefix bypasses)
+        IPAddress ip;
+        String ipStr = origin;
+        if (ipStr.startsWith("http://")) ipStr = ipStr.substring(7);
+        if (ipStr.startsWith("https://")) ipStr = ipStr.substring(8);
+        int colonIdx = ipStr.indexOf(':');
+        if (colonIdx > 0) ipStr = ipStr.substring(0, colonIdx);
+
+        if (ip.fromString(ipStr)) {
+            if (ip[0] == 10 ||
+               (ip[0] == 172 && ip[1] >= 16 && ip[1] <= 31) ||
+               (ip[0] == 192 && ip[1] == 168) ||
+               (ip[0] == 127 && ip[1] == 0 && ip[2] == 0 && ip[3] == 1)) {
+                allowed = true;
+            }
+        }
+
+        // Strict DNS Rebinding protection: Only allow Origin matching Host if Host is the actual local IP
+        if (!allowed && origin.endsWith(host)) {
+            String ipStrLocal = WiFi.localIP().toString();
+            if (host == ipStrLocal || host.startsWith(ipStrLocal + ":")) {
+                allowed = true;
+            }
+        }
+    }
+
+    if (allowed) {
+        httpServer.sendHeader("Access-Control-Allow-Origin", origin);
+        return true;
+    }
+
+    httpServer.send(403, "text/plain", "Forbidden: Invalid Origin");
+    return false;
 }
 
 // ================================================================================
@@ -879,20 +942,26 @@ void setup() {
     }
     #endif
 
+    // Configure headers to collect for CORS
+    const char* keys[] = {"Host", "Origin", "X-Requested-With"};
+    httpServer.collectHeaders(keys, (size_t)3);
+
     // HTTP routes
     httpServer.on("/",                 handleRoot);
     httpServer.on("/api/data",         handleApiData);
     httpServer.on("/api/hex",          handleApiHex);
     httpServer.on("/api/cmd",          HTTP_POST, handleApiCmd);
     httpServer.on("/api/cmd",          HTTP_OPTIONS, []() {
-        httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+        if (!handleCORS()) return;
         httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        httpServer.sendHeader("Access-Control-Allow-Headers", "X-Requested-With");
         httpServer.send(204);
     });
     httpServer.on("/api/thresholds",   HTTP_POST, handleApiThresholds);
     httpServer.on("/api/thresholds",   HTTP_OPTIONS, []() {
-        httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+        if (!handleCORS()) return;
         httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        httpServer.sendHeader("Access-Control-Allow-Headers", "X-Requested-With");
         httpServer.send(204);
     });
     httpServer.begin();
