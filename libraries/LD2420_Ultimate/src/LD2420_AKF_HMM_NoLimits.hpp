@@ -19,9 +19,11 @@
 
 #pragma once
 #include <math.h>
-#if defined(ARDUINO_ARCH_RP2040) || defined(ARDUINO_ARCH_STM32)
-#include <arm_math.h>
-#endif
+// Avoid including arm_math.h directly as it can cause compilation failures
+// on RP2040 if the DSP libraries are not explicitly linked in the environment.
+// #if defined(ARDUINO_ARCH_RP2040) || defined(ARDUINO_ARCH_STM32)
+// #include <arm_math.h>
+// #endif
 #include <stdint.h>
 #include <string.h>
 
