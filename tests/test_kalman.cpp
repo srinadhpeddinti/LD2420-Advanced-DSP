@@ -25,3 +25,4 @@ TEST_CASE("HMM State Initialization", "[HMM]") {
     UltimateDSP::MarkovActivityEngine hmm;
     REQUIRE_THAT(hmm.A[0][0], Catch::Matchers::WithinAbs(0.950, 0.001));
 }
+constexpr double UltimateDSP::MarkovActivityEngine::A_INIT[UltimateDSP::HMM_STATES][UltimateDSP::HMM_STATES];
