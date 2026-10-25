@@ -19,7 +19,7 @@
 
 #pragma once
 #include <math.h>
-#if defined(ARDUINO_ARCH_RP2040) || defined(ARDUINO_ARCH_STM32)
+#if defined(ARDUINO_ARCH_STM32)
 #include <arm_math.h>
 #endif
 #include <stdint.h>

@@ -2,6 +2,8 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include "LD2420_AKF_HMM_NoLimits.hpp"
 
+constexpr double UltimateDSP::MarkovActivityEngine::A_INIT[UltimateDSP::HMM_STATES][UltimateDSP::HMM_STATES];
+
 TEST_CASE("AdaptiveKalmanFilter Initialization", "[Kalman]") {
     UltimateDSP::AdaptiveKalmanFilter kf(0.5);
     REQUIRE(kf.x[0] == 0.5);
@@ -24,4 +26,20 @@ TEST_CASE("Kalman Prediction and Update", "[Kalman]") {
 TEST_CASE("HMM State Initialization", "[HMM]") {
     UltimateDSP::MarkovActivityEngine hmm;
     REQUIRE_THAT(hmm.A[0][0], Catch::Matchers::WithinAbs(0.950, 0.001));
+}
+
+TEST_CASE("SupportVectorMachine predict", "[SVM]") {
+    UltimateML::SupportVectorMachine svm;
+
+    SECTION("Predicts Class 2 for Standing inputs due to heuristic weights (intercept dominates)") {
+        REQUIRE(svm.predict(10.0, 100.0) == 2);
+    }
+
+    SECTION("Predicts Class 1 for Sitting inputs") {
+        REQUIRE(svm.predict(5.0, 50.0) == 1);
+    }
+
+    SECTION("Predicts Class 2 for Prone inputs") {
+        REQUIRE(svm.predict(2.0, 10.0) == 2);
+    }
 }

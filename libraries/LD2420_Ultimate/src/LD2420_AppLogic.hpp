@@ -5,6 +5,33 @@
 
 #include <LittleFS.h>
 
+#define TELEMETRY_HZ 10
+#define TELEMETRY_MS (1000 / TELEMETRY_HZ)
+#define BREATHING_ANALYZE_MS 2000
+#define DOPPLER_ANALYZE_MS 1000
+#define FALL_ALERT_HOLD_MS 5000
+#define OT2_DEBOUNCE_MS 50
+#define RANGE_SANITY_MAX_CM 800
+#define RANGE_SANITY_MIN_CM 5
+#define VELOCITY_OUTLIER_M_DIST 4.0
+#define PRESENCE_TIMEOUT_MS 5000
+#define STATIC_DETECT_VEL_CM 15
+#define LED_BLINK_MS 100
+
+#if defined(ARDUINO_ARCH_RP2040)
+#include "pico/mutex.h"
+extern mutex_t radar_mutex;
+#define LOCK_RADAR()   mutex_enter_blocking(&radar_mutex)
+#define UNLOCK_RADAR() mutex_exit(&radar_mutex)
+#define VOLATILE_SHARED volatile
+#else
+#define LOCK_RADAR()
+#define UNLOCK_RADAR()
+#define VOLATILE_SHARED
+#endif
+
+namespace AppLogic {
+
 #pragma pack(push, 1)
 struct TelemetryPacket {
     uint16_t magic; // 0xBEEF
@@ -28,33 +55,7 @@ struct TelemetryPacket {
 };
 #pragma pack(pop)
 
-inline void getTelemetryBinary(TelemetryPacket& pkt) {
-    pkt.magic = 0xBEEF;
-    pkt.presence = radar.presence_fused ? 1 : 0;
-    pkt.activity = (uint8_t)radar.activity;
-    pkt.range_cm = radar.range_cm;
-    pkt.velocity_cm_s = radar.velocity_cm_s;
-    pkt.accel_cm_s2 = radar.accel_cm_s2;
-    pkt.jerk_cm_s3 = radar.jerk_cm_s3;
-    pkt.cadence_hz = radar.cadence_hz;
-    pkt.breathing_bpm = radar.breathing_rate_bpm;
-    pkt.heart_rate_bpm = radar.heart_rate_bpm;
-    pkt.posture_class = radar.posture_class;
-    pkt.sleep_stage = radar.sleep_stage;
-    pkt.anomaly_score = (uint8_t)(radar.anomaly_score * 255.0);
-    pkt.intent_leaving = radar.intent_leaving ? 1 : 0;
-    pkt.voice_prime = radar.voice_prime ? 1 : 0;
-    for(int i=0; i<8; i++) pkt.zones[i] = (uint8_t)(radar.zone_prob[i] * 255.0);
-    pkt.uptime_s = radar.uptime_s;
-    
-    // simple checksum
-    uint16_t cs = 0;
-    uint8_t* ptr = (uint8_t*)&pkt;
-    for(size_t i=0; i<sizeof(TelemetryPacket)-2; i++) {
-        cs += ptr[i];
-    }
-    pkt.checksum = cs;
-}
+inline void getTelemetryBinary(TelemetryPacket& pkt);
 
 inline void logActivityTransition(UltimateDSP::HMMState old_state, UltimateDSP::HMMState new_state) {
     if(LittleFS.begin()) {
@@ -67,32 +68,6 @@ inline void logActivityTransition(UltimateDSP::HMMState old_state, UltimateDSP::
 }
 
 
-#define TELEMETRY_HZ 10 
-#define TELEMETRY_MS (1000 / TELEMETRY_HZ)
-#define BREATHING_ANALYZE_MS 2000   
-#define DOPPLER_ANALYZE_MS 1000     
-#define FALL_ALERT_HOLD_MS 5000     
-#define OT2_DEBOUNCE_MS 50          
-#define RANGE_SANITY_MAX_CM 800     
-#define RANGE_SANITY_MIN_CM 5       
-#define VELOCITY_OUTLIER_M_DIST 4.0 
-#define PRESENCE_TIMEOUT_MS 5000    
-#define STATIC_DETECT_VEL_CM 15     
-#define LED_BLINK_MS 100            
-
-#if defined(ARDUINO_ARCH_RP2040)
-#include "pico/mutex.h"
-extern mutex_t radar_mutex;
-#define LOCK_RADAR()   mutex_enter_blocking(&radar_mutex)
-#define UNLOCK_RADAR() mutex_exit(&radar_mutex)
-#define VOLATILE_SHARED volatile
-#else
-#define LOCK_RADAR()
-#define UNLOCK_RADAR()
-#define VOLATILE_SHARED
-#endif
-
-namespace AppLogic {
 
 UltimateDSP::AdaptiveKalmanFilter kalman(0.0);
 UltimateDSP::MarkovActivityEngine markov;
@@ -559,7 +534,36 @@ inline void blinkLED() {
 //   outliers            — Mahalanobis-rejected range spikes
 //   uptime_s            — system uptime in seconds
 // ─────────────────────────────────────────────────────────────────────────────
-inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
+inline void getTelemetryBinary(TelemetryPacket& pkt) {
+    pkt.magic = 0xBEEF;
+    pkt.presence = radar.presence_fused ? 1 : 0;
+    pkt.activity = (uint8_t)radar.activity;
+    pkt.range_cm = radar.range_cm;
+    pkt.velocity_cm_s = radar.velocity_cm_s;
+    pkt.accel_cm_s2 = radar.accel_cm_s2;
+    pkt.jerk_cm_s3 = radar.jerk_cm_s3;
+    pkt.cadence_hz = radar.cadence_hz;
+    pkt.breathing_bpm = radar.breathing_rate_bpm;
+    pkt.heart_rate_bpm = radar.heart_rate_bpm;
+    pkt.posture_class = radar.posture_class;
+    pkt.sleep_stage = radar.sleep_stage;
+    pkt.anomaly_score = (uint8_t)(radar.anomaly_score * 255.0);
+    pkt.intent_leaving = radar.intent_leaving ? 1 : 0;
+    pkt.voice_prime = radar.voice_prime ? 1 : 0;
+    for(int i=0; i<8; i++) pkt.zones[i] = (uint8_t)(radar.zone_prob[i] * 255.0);
+    pkt.uptime_s = radar.uptime_s;
+
+    // simple checksum
+    uint16_t cs = 0;
+    uint8_t* ptr = (uint8_t*)&pkt;
+    for(size_t i=0; i<sizeof(TelemetryPacket)-2; i++) {
+        cs += ptr[i];
+    }
+    pkt.checksum = cs;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+inline void getTelemetryJson(JsonDocument& doc) {
   // 1024 bytes is enough for this schema (~600 bytes serialized)
   
 
@@ -575,7 +579,7 @@ inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
   // ── Activity ─────────────────────────────────────────────────────────────
   doc["activity"] = UltimateDSP::hmmStateName(radar.activity);
 
-  JsonArray aprobs = doc.createNestedArray("activity_probs");
+  JsonArray aprobs = doc["activity_probs"].to<JsonArray>();
   for (int i = 0; i < UltimateDSP::HMM_STATES; i++)
     aprobs.add(serialized(String(radar.activity_probs[i], 3)));
 
@@ -612,9 +616,9 @@ inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
   doc["fall_time_ms"] = radar.fall_time_ms;
 
   // ── Occupancy Grid ───────────────────────────────────────────────────────
-  JsonArray zones = doc.createNestedArray("zones");
+  JsonArray zones = doc["zones"].to<JsonArray>();
   for (int z = 0; z < UltimateDSP::OccupancyGridEngine::ZONES; z++) {
-    JsonObject zobj = zones.createNestedObject();
+    JsonObject zobj = zones.add<JsonObject>();
     zobj["z"] = z;
     zobj["m_lo"] = z * 100;
     zobj["m_hi"] = (z + 1) * 100;
