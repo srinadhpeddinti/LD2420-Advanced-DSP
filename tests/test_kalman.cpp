@@ -2,6 +2,9 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include "LD2420_AKF_HMM_NoLimits.hpp"
 
+// Define the static member since it's odr-used by Catch2 when it shouldn't be but apparently is due to C++ standard.
+constexpr double UltimateDSP::MarkovActivityEngine::A_INIT[6][6];
+
 TEST_CASE("AdaptiveKalmanFilter Initialization", "[Kalman]") {
     UltimateDSP::AdaptiveKalmanFilter kf(0.5);
     REQUIRE(kf.x[0] == 0.5);
