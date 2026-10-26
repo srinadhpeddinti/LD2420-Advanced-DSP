@@ -764,13 +764,55 @@ void mqttPublish() {
 // ================================================================================
 // WEB SERVER HANDLERS
 // ================================================================================
+
+bool validateSecurity() {
+    String origin = httpServer.header("Origin");
+    String host = httpServer.header("Host");
+    String xrw = httpServer.header("X-Requested-With");
+
+    if (httpServer.method() == HTTP_POST && xrw != "XMLHttpRequest") {
+        httpServer.send(403, "text/plain", "Forbidden");
+        return false;
+    }
+
+    if (origin == "" || origin == "null") {
+        if (httpServer.method() != HTTP_GET) {
+            httpServer.send(403, "text/plain", "Forbidden");
+            return false;
+        }
+        httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+        return true;
+    }
+
+    String oHost = origin;
+    if (oHost.startsWith("http://")) oHost = oHost.substring(7);
+    else if (oHost.startsWith("https://")) oHost = oHost.substring(8);
+    int c = oHost.indexOf(':');
+    if (c != -1) oHost = oHost.substring(0, c);
+
+    String hHost = host;
+    c = hHost.indexOf(':');
+    if (c != -1) hHost = hHost.substring(0, c);
+
+    IPAddress ip;
+    if (oHost == hHost && (ip.fromString(hHost) || hHost.endsWith(".local"))) {
+        httpServer.sendHeader("Access-Control-Allow-Origin", origin);
+        return true;
+    }
+
+    httpServer.send(403, "text/plain", "Forbidden");
+    return false;
+}
+
+// ================================================================================
+
 void handleApiData() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    if (!validateSecurity()) return;
     httpServer.send(200, "application/json", buildJsonPayload(true));
 }
 
 void handleApiHex() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    if (!validateSecurity()) return;
     String out;
     out.reserve(SNAPSHOT_SIZE + 10);
     uint16_t start = snapIdx;
@@ -783,7 +825,7 @@ void handleApiHex() {
 }
 
 void handleApiCmd() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    if (!validateSecurity()) return;
     if (!httpServer.hasArg("action")) {
         httpServer.send(400, "text/plain", "Missing action");
         return;
@@ -806,7 +848,7 @@ void handleApiCmd() {
 }
 
 void handleApiThresholds() {
-    httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+    if (!validateSecurity()) return;
     if (httpServer.hasArg("motion_cm"))    threshold_motion_cm = httpServer.arg("motion_cm").toInt();
     if (httpServer.hasArg("static_cm"))    threshold_static_cm = httpServer.arg("static_cm").toInt();
     if (httpServer.hasArg("sensitivity"))  sensitivity_level   = httpServer.arg("sensitivity").toInt();
@@ -885,16 +927,20 @@ void setup() {
     httpServer.on("/api/hex",          handleApiHex);
     httpServer.on("/api/cmd",          HTTP_POST, handleApiCmd);
     httpServer.on("/api/cmd",          HTTP_OPTIONS, []() {
-        httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+        httpServer.sendHeader("Access-Control-Allow-Origin", httpServer.header("Origin"));
         httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        httpServer.sendHeader("Access-Control-Allow-Headers", "X-Requested-With");
         httpServer.send(204);
     });
     httpServer.on("/api/thresholds",   HTTP_POST, handleApiThresholds);
     httpServer.on("/api/thresholds",   HTTP_OPTIONS, []() {
-        httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+        httpServer.sendHeader("Access-Control-Allow-Origin", httpServer.header("Origin"));
         httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        httpServer.sendHeader("Access-Control-Allow-Headers", "X-Requested-With");
         httpServer.send(204);
     });
+    const char* keys[] = {"Host", "Origin", "X-Requested-With"};
+    httpServer.collectHeaders(keys, (size_t)3);
     httpServer.begin();
 
     // WebSocket
