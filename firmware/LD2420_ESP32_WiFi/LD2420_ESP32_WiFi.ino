@@ -766,24 +766,30 @@ void mqttPublish() {
 // ================================================================================
 
 bool validateSecurity() {
+    String xrw = httpServer.header("X-Requested-With");
     String origin = httpServer.header("Origin");
     String host = httpServer.header("Host");
-    String xrw = httpServer.header("X-Requested-With");
 
+    // 1. Enforce X-Requested-With for POST requests (anti-CSRF)
     if (httpServer.method() == HTTP_POST && xrw != "XMLHttpRequest") {
-        httpServer.send(403, "text/plain", "Forbidden");
+        httpServer.send(403, "text/plain", "Forbidden: Missing X-Requested-With");
         return false;
     }
 
-    if (origin == "" || origin == "null") {
-        if (httpServer.method() != HTTP_GET) {
-            httpServer.send(403, "text/plain", "Forbidden");
-            return false;
-        }
+    // 2. Strict Origin Validation
+    if (origin == "") {
+        // Programmatic API clients or same-origin requests
         httpServer.sendHeader("Access-Control-Allow-Origin", "*");
         return true;
     }
 
+    if (origin == "null") {
+        // Local file dashboard
+        httpServer.sendHeader("Access-Control-Allow-Origin", "null");
+        return true;
+    }
+
+    // Validate if origin matches host (allow same-device access via IP or .local)
     String oHost = origin;
     if (oHost.startsWith("http://")) oHost = oHost.substring(7);
     else if (oHost.startsWith("https://")) oHost = oHost.substring(8);
@@ -794,13 +800,19 @@ bool validateSecurity() {
     c = hHost.indexOf(':');
     if (c != -1) hHost = hHost.substring(0, c);
 
+    // Check if the host itself is valid (DNS rebinding protection fallback)
     IPAddress ip;
-    if (oHost == hHost && (ip.fromString(hHost) || hHost.endsWith(".local"))) {
+    if (!(ip.fromString(hHost) || hHost.endsWith(".local"))) {
+        httpServer.send(403, "text/plain", "Forbidden: DNS Rebinding Protection");
+        return false;
+    }
+
+    if (oHost == hHost) {
         httpServer.sendHeader("Access-Control-Allow-Origin", origin);
         return true;
     }
 
-    httpServer.send(403, "text/plain", "Forbidden");
+    httpServer.send(403, "text/plain", "Forbidden: Cross-Origin Requests Not Allowed");
     return false;
 }
 
@@ -927,14 +939,14 @@ void setup() {
     httpServer.on("/api/hex",          handleApiHex);
     httpServer.on("/api/cmd",          HTTP_POST, handleApiCmd);
     httpServer.on("/api/cmd",          HTTP_OPTIONS, []() {
-        httpServer.sendHeader("Access-Control-Allow-Origin", httpServer.header("Origin"));
+        if (!validateSecurity()) return;
         httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
         httpServer.sendHeader("Access-Control-Allow-Headers", "X-Requested-With");
         httpServer.send(204);
     });
     httpServer.on("/api/thresholds",   HTTP_POST, handleApiThresholds);
     httpServer.on("/api/thresholds",   HTTP_OPTIONS, []() {
-        httpServer.sendHeader("Access-Control-Allow-Origin", httpServer.header("Origin"));
+        if (!validateSecurity()) return;
         httpServer.sendHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
         httpServer.sendHeader("Access-Control-Allow-Headers", "X-Requested-With");
         httpServer.send(204);
