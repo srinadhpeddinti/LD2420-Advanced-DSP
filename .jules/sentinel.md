@@ -1,3 +1,8 @@
+## 2024-05-18 - Hardcoded Access Point Setup Credentials
+**Vulnerability:** Default Wi-Fi Access Point password defined as hardcoded string in firmware source files.
+**Learning:** Hardcoded fallback credentials in firmware templates risk exposure if users deploy builds without manually modifying source code.
+**Prevention:** Guard macro definitions for AP credentials with `#ifndef` preprocessor checks to enable build-time overriding via build flags or environment configuration.
+
 ## 2024-05-18 - State-modifying API endpoints allowing GET requests
 **Vulnerability:** CSRF vulnerability due to state-modifying endpoints (/api/cmd and /api/thresholds) allowing simple GET requests.
 **Learning:** In simple ESP-based web servers, it is common to define routes without a specific HTTP method restriction. This allows unintended state changes via cross-origin GET requests.
