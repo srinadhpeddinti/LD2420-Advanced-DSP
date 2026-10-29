@@ -58,9 +58,13 @@
 // USER CONFIGURATION — EDIT THESE
 // ================================================================================
 
-// Captive Portal AP Name
-const char* AP_SSID          = "LD2420_Setup";
-const char* AP_PASS          = "YOUR_SETUP_PASSWORD";
+// Captive Portal AP Name (can be overridden via build flags: -DAP_SSID=... -DAP_PASS=...)
+#ifndef AP_SSID
+#define AP_SSID "LD2420_Setup"
+#endif
+#ifndef AP_PASS
+#define AP_PASS "YOUR_SETUP_PASSWORD"
+#endif
 
 // MQTT (optional — set to "" to disable)
 #if ENABLE_MQTT

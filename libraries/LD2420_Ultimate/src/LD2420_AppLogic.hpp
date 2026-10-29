@@ -5,6 +5,12 @@
 
 #include <LittleFS.h>
 
+#ifndef IRAM_ATTR
+#define IRAM_ATTR
+#endif
+
+namespace AppLogic {
+
 #pragma pack(push, 1)
 struct TelemetryPacket {
     uint16_t magic; // 0xBEEF
@@ -27,34 +33,6 @@ struct TelemetryPacket {
     uint16_t checksum;
 };
 #pragma pack(pop)
-
-inline void getTelemetryBinary(TelemetryPacket& pkt) {
-    pkt.magic = 0xBEEF;
-    pkt.presence = radar.presence_fused ? 1 : 0;
-    pkt.activity = (uint8_t)radar.activity;
-    pkt.range_cm = radar.range_cm;
-    pkt.velocity_cm_s = radar.velocity_cm_s;
-    pkt.accel_cm_s2 = radar.accel_cm_s2;
-    pkt.jerk_cm_s3 = radar.jerk_cm_s3;
-    pkt.cadence_hz = radar.cadence_hz;
-    pkt.breathing_bpm = radar.breathing_rate_bpm;
-    pkt.heart_rate_bpm = radar.heart_rate_bpm;
-    pkt.posture_class = radar.posture_class;
-    pkt.sleep_stage = radar.sleep_stage;
-    pkt.anomaly_score = (uint8_t)(radar.anomaly_score * 255.0);
-    pkt.intent_leaving = radar.intent_leaving ? 1 : 0;
-    pkt.voice_prime = radar.voice_prime ? 1 : 0;
-    for(int i=0; i<8; i++) pkt.zones[i] = (uint8_t)(radar.zone_prob[i] * 255.0);
-    pkt.uptime_s = radar.uptime_s;
-    
-    // simple checksum
-    uint16_t cs = 0;
-    uint8_t* ptr = (uint8_t*)&pkt;
-    for(size_t i=0; i<sizeof(TelemetryPacket)-2; i++) {
-        cs += ptr[i];
-    }
-    pkt.checksum = cs;
-}
 
 inline void logActivityTransition(UltimateDSP::HMMState old_state, UltimateDSP::HMMState new_state) {
     if(LittleFS.begin()) {
@@ -91,8 +69,6 @@ extern mutex_t radar_mutex;
 #define UNLOCK_RADAR()
 #define VOLATILE_SHARED
 #endif
-
-namespace AppLogic {
 
 UltimateDSP::AdaptiveKalmanFilter kalman(0.0);
 UltimateDSP::MarkovActivityEngine markov;
@@ -386,6 +362,8 @@ inline void runActivityClassification() {
   double innov = radar.kalman_innovation;
   uint32_t state_dur_s = (millis() - radar.state_start_ms) / 1000;
 
+  (void)state_dur_s;
+
   // Feed HMM forward algorithm
   if (present) {
     markov.processEmissions((double)radar.velocity_cm_s, accel, innov);
@@ -646,6 +624,32 @@ inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
   
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+inline void getTelemetryBinary(TelemetryPacket& pkt) {
+    pkt.magic = 0xBEEF;
+    pkt.presence = radar.presence_fused ? 1 : 0;
+    pkt.activity = (uint8_t)radar.activity;
+    pkt.range_cm = radar.range_cm;
+    pkt.velocity_cm_s = radar.velocity_cm_s;
+    pkt.accel_cm_s2 = radar.accel_cm_s2;
+    pkt.jerk_cm_s3 = radar.jerk_cm_s3;
+    pkt.cadence_hz = radar.cadence_hz;
+    pkt.breathing_bpm = radar.breathing_rate_bpm;
+    pkt.heart_rate_bpm = radar.heart_rate_bpm;
+    pkt.posture_class = radar.posture_class;
+    pkt.sleep_stage = radar.sleep_stage;
+    pkt.anomaly_score = (uint8_t)(radar.anomaly_score * 255.0);
+    pkt.intent_leaving = radar.intent_leaving ? 1 : 0;
+    pkt.voice_prime = radar.voice_prime ? 1 : 0;
+    for(int i=0; i<8; i++) pkt.zones[i] = (uint8_t)(radar.zone_prob[i] * 255.0);
+    pkt.uptime_s = radar.uptime_s;
+
+    // simple checksum
+    uint16_t cs = 0;
+    uint8_t* ptr = (uint8_t*)&pkt;
+    for(size_t i=0; i<sizeof(TelemetryPacket)-2; i++) {
+        cs += ptr[i];
+    }
+    pkt.checksum = cs;
+}
 
 } // namespace AppLogic
