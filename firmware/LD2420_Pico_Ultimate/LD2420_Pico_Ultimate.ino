@@ -60,7 +60,9 @@ dma_channel_config dma_cfg;
 #define PIN_RADAR_TX 0
 #define PIN_RADAR_RX 1
 #define PIN_RADAR_OT2 2
+#ifndef PIN_LED
 #define PIN_LED 3
+#endif
 
 #include "hardware/uart.h"
 
