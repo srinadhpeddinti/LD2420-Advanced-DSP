@@ -1,9 +1,19 @@
 #pragma once
 
 #include "LD2420_AKF_HMM_NoLimits.hpp"
+#include <LittleFS.h>
 #include <ArduinoJson.h>
 
-#include <LittleFS.h>
+
+
+
+
+namespace AppLogic {
+
+extern struct RadarState radar;
+
+
+
 
 #pragma pack(push, 1)
 struct TelemetryPacket {
@@ -92,7 +102,7 @@ extern mutex_t radar_mutex;
 #define VOLATILE_SHARED
 #endif
 
-namespace AppLogic {
+
 
 UltimateDSP::AdaptiveKalmanFilter kalman(0.0);
 UltimateDSP::MarkovActivityEngine markov;
@@ -189,6 +199,10 @@ uint32_t led_off_ms = 0;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OT2 INTERRUPT HANDLER (Hardware Doppler pin)
+#ifndef IRAM_ATTR
+#define IRAM_ATTR
+#endif
+
 // ─────────────────────────────────────────────────────────────────────────────
 volatile bool ot2_raw = false;
 volatile uint32_t ot2_last_ms = 0;
@@ -384,7 +398,7 @@ inline void runActivityClassification() {
   int32_t abs_vel = abs(radar.velocity_cm_s);
   double accel = radar.accel_cm_s2;
   double innov = radar.kalman_innovation;
-  uint32_t state_dur_s = (millis() - radar.state_start_ms) / 1000;
+  // uint32_t state_dur_s = (millis() - radar.state_start_ms) / 1000;
 
   // Feed HMM forward algorithm
   if (present) {
@@ -559,7 +573,7 @@ inline void blinkLED() {
 //   outliers            — Mahalanobis-rejected range spikes
 //   uptime_s            — system uptime in seconds
 // ─────────────────────────────────────────────────────────────────────────────
-inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
+inline void getTelemetryJson(JsonDocument& doc) {
   // 1024 bytes is enough for this schema (~600 bytes serialized)
   
 
@@ -575,7 +589,7 @@ inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
   // ── Activity ─────────────────────────────────────────────────────────────
   doc["activity"] = UltimateDSP::hmmStateName(radar.activity);
 
-  JsonArray aprobs = doc.createNestedArray("activity_probs");
+  JsonArray aprobs = doc["activity_probs"].to<JsonArray>();
   for (int i = 0; i < UltimateDSP::HMM_STATES; i++)
     aprobs.add(serialized(String(radar.activity_probs[i], 3)));
 
@@ -612,9 +626,9 @@ inline void getTelemetryJson(StaticJsonDocument<1024>& doc) {
   doc["fall_time_ms"] = radar.fall_time_ms;
 
   // ── Occupancy Grid ───────────────────────────────────────────────────────
-  JsonArray zones = doc.createNestedArray("zones");
+  JsonArray zones = doc["zones"].to<JsonArray>();
   for (int z = 0; z < UltimateDSP::OccupancyGridEngine::ZONES; z++) {
-    JsonObject zobj = zones.createNestedObject();
+    JsonObject zobj = zones.add<JsonObject>();
     zobj["z"] = z;
     zobj["m_lo"] = z * 100;
     zobj["m_hi"] = (z + 1) * 100;
