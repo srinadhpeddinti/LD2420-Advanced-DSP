@@ -19,9 +19,6 @@
 
 #pragma once
 #include <math.h>
-#if defined(ARDUINO_ARCH_RP2040) || defined(ARDUINO_ARCH_STM32)
-#include <arm_math.h>
-#endif
 #include <stdint.h>
 #include <string.h>
 
@@ -1215,7 +1212,7 @@ public:
 class DecisionTreeClassifier {
 public:
     // Simple Embedded CART tree representation
-    bool isPet(double height_estimate_cm, double avg_velocity, double target_rcs) {
+    bool isPet(double /*height_estimate_cm*/, double avg_velocity, double target_rcs) {
         if(target_rcs < 30.0) {
             if(avg_velocity > 100.0) return true; // Fast small object -> Dog/Cat
             else return false; // Slow small object -> Clutter/Fan
@@ -1336,7 +1333,7 @@ public:
     bool is_initialized = false;
     // float input_tensor[128]; // Raw velocity buffer (12.8s at 10Hz)
     
-    bool predictFall(double current_velocity) {
+    bool predictFall(double /*current_velocity*/) {
         // This is a stub for the future `tflite::MicroInterpreter` integration.
         // Currently returns false.
         return false;
