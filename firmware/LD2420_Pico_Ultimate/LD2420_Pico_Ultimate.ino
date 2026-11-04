@@ -60,7 +60,9 @@ dma_channel_config dma_cfg;
 #define PIN_RADAR_TX 0
 #define PIN_RADAR_RX 1
 #define PIN_RADAR_OT2 2
+#ifndef PIN_LED
 #define PIN_LED 3
+#endif
 
 #include "hardware/uart.h"
 
@@ -93,12 +95,12 @@ void loop1() {
     if (millis() - AppLogic::last_broadcast_ms >= TELEMETRY_MS) {
         AppLogic::last_broadcast_ms = millis();
         
-        AppLogic::TelemetryPacket pkt;
+        TelemetryPacket pkt;
         LOCK_RADAR();
-        AppLogic::getTelemetryBinary(pkt);
+        getTelemetryBinary(pkt);
         UNLOCK_RADAR();
         
-        Serial.write((const uint8_t*)&pkt, sizeof(AppLogic::TelemetryPacket));
+        Serial.write((const uint8_t*)&pkt, sizeof(TelemetryPacket));
         Serial.flush();
         AppLogic::blinkLED();
     }
@@ -179,7 +181,7 @@ void loop() {
         int32_t centered = (int32_t)adc_buffer[i] - 2048;
         sum_sq += centered * centered;
     }
-    double rms_if = sqrt((double)sum_sq / ADC_SAMPLES);
+    double rms_if = sqrt((double)sum_sq / ADC_SAMPLES); (void)rms_if;
     dma_channel_configure(dma_chan, &dma_cfg, adc_buffer, &adc_hw->fifo, ADC_SAMPLES, true);
     adc_run(true);
   }
