@@ -5,4 +5,4 @@
 ## 2024-05-18 - Hardcoded secrets in setup configuration
 **Vulnerability:** Hardcoded setup credentials (AP_PASS) in the firmware source code which may be committed to version control.
 **Learning:** In microcontroller firmware (ESP8266/ESP32), it is common to hardcode default Access Point credentials in the global variables. This is a bad practice as it leaks secrets if the source code is made public.
-**Prevention:** Wrap default AP setup credentials in `#ifndef` preprocessor guards. This allows overriding them via compiler flags (e.g., `-DAP_PASS="..."`) during the build process without committing sensitive shared secrets into the repository.
+**Prevention:** Wrap default AP setup credentials in `#ifndef` preprocessor guards. This allows overriding them via compiler flags (e.g., `-DAP_PASS_MACRO="..."`) during the build process without committing sensitive shared secrets into the repository.
