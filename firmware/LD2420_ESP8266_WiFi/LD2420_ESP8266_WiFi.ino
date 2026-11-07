@@ -59,8 +59,14 @@
 // ================================================================================
 
 // Captive Portal AP Name
-const char* AP_SSID          = "LD2420_Setup";
-const char* AP_PASS          = "YOUR_SETUP_PASSWORD";
+#ifndef AP_SSID_MACRO
+#define AP_SSID_MACRO "LD2420_Setup"
+#endif
+#ifndef AP_PASS_MACRO
+#define AP_PASS_MACRO "YOUR_SETUP_PASSWORD"
+#endif
+const char* AP_SSID          = AP_SSID_MACRO;
+const char* AP_PASS          = AP_PASS_MACRO;
 
 // MQTT (optional — set to "" to disable)
 #if ENABLE_MQTT
