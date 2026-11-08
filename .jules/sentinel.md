@@ -10,3 +10,7 @@
 **Vulnerability:** Not a direct vulnerability, but a workflow bug affecting the stability and testability of code which is crucial for security.
 **Learning:** `arduino/compile-sketches` action relies on exact path resolutions. Using a relative path for custom local libraries like `./libraries/LibraryName` in `cli-compile-flags` can fail to locate local files during CI builds on GitHub.
 **Prevention:** Always use the absolute path variable `${{ github.workspace }}` for custom local libraries to ensure proper resolution by the `arduino-cli`.
+## 2025-02-18 - Extraneous CMSIS headers causing CI compilation failure
+**Vulnerability:** Workflow/build stability issue.
+**Learning:** Including hardware-specific CMSIS headers like `<arm_math.h>` when their functions are not utilized can cause fatal 'No such file or directory' compilation errors if the DSP libraries are not explicitly linked, specifically affecting `arduino/compile-sketches` builds for RP2040/STM32.
+**Prevention:** Do not unnecessarily include `<arm_math.h>` or similar CMSIS headers in cross-platform DSP header files if the CMSIS DSP library features are not directly invoked.
