@@ -14,3 +14,11 @@
 **Vulnerability:** Workflow/build stability issue.
 **Learning:** Including hardware-specific CMSIS headers like `<arm_math.h>` when their functions are not utilized can cause fatal 'No such file or directory' compilation errors if the DSP libraries are not explicitly linked, specifically affecting `arduino/compile-sketches` builds for RP2040/STM32.
 **Prevention:** Do not unnecessarily include `<arm_math.h>` or similar CMSIS headers in cross-platform DSP header files if the CMSIS DSP library features are not directly invoked.
+## 2025-02-18 - C++ Namespace scoping issue causing compilation failure
+**Vulnerability:** Workflow/build stability issue.
+**Learning:** `TelemetryPacket` and `getTelemetryBinary` must be declared inside the `AppLogic` namespace as they are called with `AppLogic::` in the `LD2420_Pico_Ultimate.ino` sketch, and `radar` is an `extern` variable declared further down or within that namespace.
+**Prevention:** Ensure interdependent structs, inline functions, and `extern` variables in `LD2420_AppLogic.hpp` are appropriately wrapped in their respective namespaces.
+## 2025-02-18 - Multiple CI compilation errors (ArduinoJson v7, Namespaces, Unused variables)
+**Vulnerability:** Workflow/build stability issue.
+**Learning:** Updates to ArduinoJson v7 deprecate older syntax (e.g. `StaticJsonDocument`, `createNestedArray`). Strict build flags (`-Werror` or strict warnings) in CI pipelines will fail builds due to unused variables and macro redefinitions. Proper scoping in C++ namespaces is crucial for interdependent logic.
+**Prevention:** Fix deprecation warnings immediately by referring to library docs (e.g. using `JsonDocument`, `add<JsonObject>()`), use `(void)` casts or commented-out parameter names to silence unused variable warnings, wrap `#define` macros with `#ifndef`, and properly encapsulate tightly-coupled data structures inside namespaces.
