@@ -60,7 +60,9 @@ dma_channel_config dma_cfg;
 #define PIN_RADAR_TX 0
 #define PIN_RADAR_RX 1
 #define PIN_RADAR_OT2 2
+#ifndef PIN_LED
 #define PIN_LED 3
+#endif
 
 #include "hardware/uart.h"
 
@@ -174,12 +176,6 @@ void loop() {
 
   if (!dma_channel_is_busy(dma_chan)) {
     adc_run(false);
-    uint32_t sum_sq = 0;
-    for(int i=0; i<ADC_SAMPLES; i++) {
-        int32_t centered = (int32_t)adc_buffer[i] - 2048;
-        sum_sq += centered * centered;
-    }
-    double rms_if = sqrt((double)sum_sq / ADC_SAMPLES);
     dma_channel_configure(dma_chan, &dma_cfg, adc_buffer, &adc_hw->fifo, ADC_SAMPLES, true);
     adc_run(true);
   }
