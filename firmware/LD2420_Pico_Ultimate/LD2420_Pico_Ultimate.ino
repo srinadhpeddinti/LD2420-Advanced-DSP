@@ -1,3 +1,8 @@
+
+#ifndef IRAM_ATTR
+#define IRAM_ATTR
+#endif
+
 /*
  * =====================================================================================
  * LD2420 PICO ULTIMATE v6.0 — TRUE DETECTION FIRMWARE
@@ -60,7 +65,9 @@ dma_channel_config dma_cfg;
 #define PIN_RADAR_TX 0
 #define PIN_RADAR_RX 1
 #define PIN_RADAR_OT2 2
+#ifndef PIN_LED
 #define PIN_LED 3
+#endif
 
 #include "hardware/uart.h"
 
@@ -70,7 +77,7 @@ uint32_t uart_read_ptr = 0;
 
 mutex_t radar_mutex;
 
-void handleOT2() {
+void IRAM_ATTR handleOT2() {
   uint32_t now = millis();
   if (now - AppLogic::ot2_last_ms > OT2_DEBOUNCE_MS) {
     AppLogic::ot2_raw = (digitalRead(PIN_RADAR_OT2) == HIGH);
@@ -180,6 +187,7 @@ void loop() {
         sum_sq += centered * centered;
     }
     double rms_if = sqrt((double)sum_sq / ADC_SAMPLES);
+    (void)rms_if;
     dma_channel_configure(dma_chan, &dma_cfg, adc_buffer, &adc_hw->fifo, ADC_SAMPLES, true);
     adc_run(true);
   }
